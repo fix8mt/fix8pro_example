@@ -1,0 +1,201 @@
+<?xml version='1.0' encoding='ISO-8859-1'?>
+<fix8>
+	<default role="initiator"
+				fix_version="1100"
+				session_log="session_log_file"
+				no_session_log="session_log_log4cxx"
+				protocol_log="protocol_log_file"
+				login_retry_interval="3000"
+				reset_sequence_numbers="false"
+				connect_timeout="3"
+				default_appl_ver_id="9"
+				heartbeat_interval="10"
+				tcp_nodelay="true"
+				always_seqnum_assign="false"
+				_server_group="FO_Group0"
+				process_model="threaded"
+				enforce_compids="false"
+				login_retries="5"
+				tabsize="3"
+				ipersist="file1"
+				decoder="canonical"
+				persist="file0" />
+
+	<session name="DLD1"
+				sender_comp_id="DLD_TEX"
+				target_comp_id="TEX1_DLD"
+				endpoint="tcp://127.0.0.1:11001"
+				supplementals="Set1"
+				permissive_mode="true"
+				active="true"/>
+
+	<session name="DLD2"
+				sender_comp_id="DLD2_TEX"
+				target_comp_id="TEX2_DLD2"
+				supplementals="Set1"
+				endpoint="tcp://127.0.0.1:11002"
+				permissive_mode="true"
+				active="true" />
+
+	<session name="DLD3"
+				sender_comp_id="DLD3_TEX"
+				target_comp_id="TEX_DLD3"
+				endpoint="tcp://127.0.0.1:11001"
+				supplementals="Set1"
+				permissive_mode="true"
+				active="true"/>
+
+	<session name="DLD3_NO"
+				sender_comp_id="DLD_TEX"
+				target_comp_id="TEX_DLD1"
+				endpoint="tcp://127.0.0.1:11001"
+				supplementals="Set1"
+				permissive_mode="true"
+				active="true"/>
+
+	<session name="DLD5"
+				sender_comp_id="DLD5_TEX"
+				target_comp_id="TEX2_DLD5"
+				supplementals="Set1"
+				endpoint="tcp://127.0.0.1:11001"
+				permissive_mode="true"
+				active="true" />
+
+	<session name="DLD4"
+				sender_comp_id="DLD4_TEX"
+				target_comp_id="TEX2_DLD4"
+				supplementals="Set1"
+				endpoint="tcp://127.0.0.1:11001"
+				permissive_mode="true"
+				active="true" />
+
+	<session name="DLD6"
+				sender_comp_id="DLD_TEX"
+				target_comp_id="TEX6_DLD"
+				endpoint="tcp://127.0.0.1:11006"
+				supplementals="Set1"
+				permissive_mode="true"
+				process_model="coroutine"
+				active="true"/>
+
+	<session name="DLD7"
+				sender_comp_id="DLD2_TEX"
+				target_comp_id="TEX7_DLD7"
+				supplementals="Set1"
+				endpoint="tcp://127.0.0.1:11007"
+				permissive_mode="true"
+				process_model="coroutine"
+				active="true" />
+
+	<session name="DLD8"
+				sender_comp_id="DLD8_TEX"
+				target_comp_id="TEX8_DLD8"
+				supplementals="Set1"
+				endpoint="tcp://127.0.0.1:11008"
+				permissive_mode="true"
+				process_model="coroutine"
+				active="true" />
+
+	<schedule name="reset_schedule01"
+				start_time="22:00:00"
+				end_time="22:01:00"
+				start_day="0"
+				end_day="0"
+				utc_offset_mins="auto" />
+
+	<supplementals name="Set1">
+		<field number='9999' name='SampleUserField'  type='STRING' messages='NewOrderSingle:N ExecutionReport:N OrderCancelRequest:Y' />
+		<field number='9991' name='SampleUserField2' type='STRING' messages='NewOrderSingle:N ExecutionReport:N OrderCancelRequest:Y' />
+	</supplementals>
+
+	<persist name="file0"
+            type="file" dir="./run"
+            use_session_id="true"
+            rotation="5"
+            db="client" />
+
+	<persist name="file1"
+            type="file" dir="./run"
+            use_session_id="true"
+            rotation="5"
+            db="inbound_client" />
+
+	<persist name="bdb0"
+				type="bdb" dir="./run"
+				db="myfix_client.db" />
+
+	<persist name="mem0"
+				type="memory" />
+
+	<log 		name="pipe"
+				type="pipe"
+				filename="|/bin/cat"
+				rotation="5"
+				flags="timestamp|sequence|thread"/>
+
+	<log 		name="session_log_log4cxx"
+				type="log4cxx"
+				logger="mysession"
+				levels="debug|info|warn|error|fatal"
+				flags="sequence|timestamp|sstart|thread|location|level"/>
+
+	<log 		name="session_log_file"
+				type="file"
+				filename="./run/myfix_client_session.log"
+				rotation="5"
+				levels="debug|info|warn|error|fatal"
+				flags="sequence|timestamp|sstart|thread|location|level"/>
+
+	<log 		name="session_log_udp"
+				type="broadcast"
+				filename="udp://127.0.0.1:51000"
+				rotation="5"
+				flags="timestamp|sequence|thread"/>
+
+	<log 		name="protocol_log_udp"
+				type="broadcast"
+				filename="udp://127.0.0.1:514"
+				flags="sequence|append|direction|inbound|outbound"/>
+
+	<log 		name="protocol_log_with_attributes"
+				type="file"
+				filename="./run/myfix_client_protocol.log"
+				rotation="5"
+				flags="sequence|append|direction|compress|inbound|outbound"/>
+
+	<log 		name="protocol_log_pipe"
+				type="pipe"
+				filename="|/bin/cat"
+				rotation="5"
+				flags="append|inbound"/>
+
+	<log 		name="smtp_log"
+				type="smtp"
+				levels="fatal"
+				flags="sequence|timestamp|thread|location|level"
+				from="anon@electro.mine.nu"
+				to="David Dight &lt;davidd@electro.mine.nu&gt;"
+				cc="davidd@computer.org,davidd@fix8mt.com"
+				smtp_server="smtp://pukha:587"
+				username="davidd"
+				pw="cmFkYStrcmlzaG5h"
+				subject="Example log email"/>
+
+	<log 		name="protocol_log_file"
+				type="file"
+				levels="debug|info|warn|error|fatal"
+				filename="./run/myfix_client_protocol.log"
+				rotation="5"
+				flags_old="append|inbound|outbound|direction|sequence"
+				flags="append|inbound|outbound"/>
+
+	<server_group name="FO_Group0">
+		<server name="Host_01" ip="192.168.1.121" port="12345" max_retries="3"/>
+		<server name="Host_02" endpoint="tcp://192.168.1.122:12345" max_retries="3"/>
+		<server name="Host_04" ip="192.168.1.124" port="12345" max_retries="3"/>
+		<server name="Host_05" ip="192.168.1.125" port="12345" max_retries="3"/>
+		<server name="Host_06" ip="127.0.0.1" port="11001" max_retries="3"/>
+		<server name="Host_03" ip="192.168.1.123" port="12345" max_retries="3" active="false"/>
+	</server_group>
+
+</fix8>
