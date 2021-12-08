@@ -12,9 +12,11 @@ You will need the following
 3. A supported C++ compiler and biuld environment
 
 ## To build
-
 ```bash
 git clone https://github.com/fix8mt/fix8pro_example.git
+cd fix8pro_example
+mkdir build
+cd build
 cmake -DFIX8PRO_LICENSE_FILE=<path to your license file> -DFIX8PRO_ROOT=<path to installed Fix8Pro package> -DCMAKE_BUILD_TYPE=Release ..
 make install
 ```
