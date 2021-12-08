@@ -54,10 +54,10 @@ endif()
 
 set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Generate debug library name with a postfix.")
 if ("${FIX8PRO_ROOT}" STREQUAL "")
-	message(FATAL_ERROR "FIX8PRO_ROOT was not set, set it by added -DFIX8PRO_ROOT=<path to fix8pro install dir>")
+	message(FATAL_ERROR "FIX8PRO_ROOT was not set, set it by adding -DFIX8PRO_ROOT=<path to fix8pro install dir>")
 endif()
 if ("${FIX8PRO_LICENSE_FILE}" STREQUAL "")
-	message(FATAL_ERROR "FIX8PRO_LICENSE_FILE was not set, set it by added -DFIX8PRO_LICENSE_FILE=<path to fix8pro license>")
+	message(FATAL_ERROR "FIX8PRO_LICENSE_FILE was not set, set it by adding -DFIX8PRO_LICENSE_FILE=<path to fix8pro license>")
 endif()
 
 message("-- fix8pro root === ${FIX8PRO_ROOT}")
@@ -92,18 +92,18 @@ include_directories(${FIX8PRO_ROOT}/include)
 include_directories(${CMAKE_BINARY_DIR}/include)
 
 # shared FIX44 lib
-add_gen_shared_library(simple_FIX44 schema/FIX44.xml  -L --verbose --namespace FIX44 -p simple_FIX44)
-	target_link_libraries(simple_FIX44 PRIVATE fix8pro fix8proutils)
+add_gen_shared_library(FIX44_EXAMPLE schema/FIX44.xml  -L --verbose --namespace FIX44_EXAMPLE -p FIX44_EXAMPLE)
+	target_link_libraries(FIX44_EXAMPLE PRIVATE fix8pro fix8proutils)
 # static FIX50SP2 lib
-add_gen_static_library(simple_FIX50SP2 schema/FIX50SP2.xml  -L --verbose --namespace FIX50SP2 -p simple_FIX50SP2 --fixt ${CMAKE_CURRENT_SOURCE_DIR}/schema/FIXT11.xml)
-	target_link_libraries(simple_FIX50SP2 PRIVATE fix8pro fix8proutils)
+# add_gen_static_library(FIX50SP2 schema/FIX50SP2.xml  -L --verbose --namespace FIX50SP2 -p FIX50SP2 --fixt ${CMAKE_CURRENT_SOURCE_DIR}/schema/FIXT11.xml)
+#	target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
 add_executable(simpleclisrv simpleclisrv.cpp)
-	target_link_libraries(simpleclisrv PRIVATE simple_FIX44 simple_FIX50SP2 fix8pro fix8proutils fix8pro_statapp)
+	target_link_libraries(simpleclisrv PRIVATE FIX44_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/.install" CACHE PATH "install path" FORCE)
 endif()
 message("-- installing to ${CMAKE_INSTALL_PREFIX}")
-install(TARGETS simpleclisrv simple_FIX44 simple_FIX50SP2 RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib/static)
+install(TARGETS simpleclisrv FIX44_EXAMPLE RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib/static)
 install(DIRECTORY config DESTINATION share/fix8pro FILES_MATCHING PATTERN *.xml)
 

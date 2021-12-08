@@ -61,18 +61,46 @@ using namespace cxxopts;
 using namespace FIX8;
 
 //-------------------------------------------------------------------------------------------------
-/// universal session for all clients/servers
+#include "FIX44_EXAMPLE_types.hpp"
+#include "FIX44_EXAMPLE_router.hpp"
+#include "FIX44_EXAMPLE_classes.hpp"
+
+//-------------------------------------------------------------------------------------------------
+class SimpleSession;
+
+/// universal inbound message router for client and server
+class SimpleSessionRouter : public FIX44_EXAMPLE::FIX44_EXAMPLE_Router
+{
+	SimpleSession& _session;
+
+public:
+	/*! Ctor.
+	    \param session client session */
+	SimpleSessionRouter(SimpleSession& session) : _session(session) {}
+
+	/*! Execution report handler. For client
+	    \param msg Execution report message session */
+	bool operator()(const FIX44_EXAMPLE::ExecutionReport *msg) const override;
+
+	/*! NewOrderSingle message handler. For server
+	    \param msg NewOrderSingle message */
+	bool operator()(const FIX44_EXAMPLE::NewOrderSingle *msg) const override;
+};
+
+//-------------------------------------------------------------------------------------------------
+/// universal session for client and server
 class SimpleSession final : public Session
 {
+	SimpleSessionRouter _router;
 
 public:
 	SimpleSession(const F8MetaCntx& ctx, const SessionID& sid, PersisterPtr persist=PersisterPtr(), // client
 		LoggerPtr logger=LoggerPtr(), LoggerPtr plogger=LoggerPtr(), SupplementalsPtr&& supplementals=SupplementalsPtr())
-		: Session(ctx, sid, persist, logger, plogger, move(supplementals)) {}
+		: Session(ctx, sid, persist, logger, plogger, move(supplementals)), _router(*this) {}
 
 	SimpleSession(const F8MetaCntx& ctx, int session_count, const f8String& sci, PersisterPtr persist=PersisterPtr(), // server
 		LoggerPtr logger=LoggerPtr(), LoggerPtr plogger=LoggerPtr(), SupplementalsPtr&& supplementals=SupplementalsPtr())
-		: Session(ctx, session_count, sci, persist, logger, plogger, move(supplementals)) {}
+		: Session(ctx, session_count, sci, persist, logger, plogger, move(supplementals)), _router(*this) {}
 
 	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
 	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
@@ -83,7 +111,7 @@ public:
 //-------------------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
-	f8String ns, libdir;
+	f8String libdir;
 	int giveupreset;
 	bool server, reliable, hb;
 	f8String clcf, global_logger_name, sses, cses, libpath;
@@ -103,7 +131,7 @@ public:
 
 //-------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
-Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_string(), "Fix8Pro sample client/server");
+Fix8ProApplicationInstance(Application, "simpleclisrv", "(your copyright string)", "Fix8Pro sample client/server");
 bool Application::quiet;
 
 //-----------------------------------------------------------------------------------------
@@ -119,15 +147,13 @@ bool Application::options_setup(Options& ops)
 		("S,send", "set next expected send sequence number", value<unsigned>(next_send)->default_value("0"))
 		("g,giveupreset", "number of reliable reconnects to try before resetting seqnums", value<int>(giveupreset)->default_value("10"))
 		("r,reliable", "start in reliable mode", value<bool>(reliable)->default_value("true")->implicit_value("false"))
-		("n,ns", "load named compiled Fix8 schema (default: FIX50SP2)", value<f8String>(ns))
 		("H,showheartbeats", "show inbound heartbeats", value<bool>(hb)->default_value("true")->implicit_value("false"))
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(libdir))
 		("s,server", "run in server mode (default client mode)", value<bool>(server)->default_value("false"));
 	add_postamble(R"(e.g.
-simpleclisrv -c config/myfix_client.xml -r -C DLD2 -n FIX44
+simpleclisrv -c config/myfix_client.xml -r -C DLD2
 simpleclisrv -c config/myfix_client.xml -r
-simpleclisrv -c config/myfix_server.xml -s
-simpleclisrv -c myfix_client.xml)");
+simpleclisrv -c config/myfix_server.xml -s)");
 	return true;
 }
 
@@ -145,12 +171,9 @@ int Application::main(const vector<f8String>& args)
 		}
 		unique_ptr<istream> istr { make_unique<ifstream>(clcf.c_str()) };
 
-		if (!has("ns"))
-			ns = "FIX50SP2";
-		cout << "using " << ns << endl;
 		void *handle{};
 		f8String errstr;
-		auto [ctxfunc, libp] { load_cast_ctx_from_so(ns, libdir, handle, errstr) };
+		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX44", libdir, handle, errstr) };
 		if (!ctxfunc)
 		{
 			cerr << errstr << endl;
@@ -242,7 +265,7 @@ void SimpleSession::print_message(const MessagePtr& msg, ostream& os, bool useco
 	{
 		static const f8String rule { f8String(20, '-') + " received " + f8String(20, '-') };
 		cout << '\r' << rule << endl;
-		Session::print_message(msg, cout, Application::use_colour());
+		Session::print_message(msg, cout, usecolour);
 	}
 }
 
@@ -276,3 +299,15 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 		logout_and_shutdown("");
 }
 
+//-----------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
+bool SimpleSessionRouter::operator()(const FIX44_EXAMPLE::ExecutionReport *msg) const
+{
+	return true;
+}
+
+//-----------------------------------------------------------------------------------------
+bool SimpleSessionRouter::operator()(const FIX44_EXAMPLE::NewOrderSingle *msg) const
+{
+	return true;
+}
