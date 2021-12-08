@@ -6,10 +6,10 @@
 Simple example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
 ## Before you start
-You will need the following
+You will need the following to build this example:
+1. A supported C++ compiler and build environment
 1. A Fix8Pro license from Fix8MT (this could be an evaluation license)
-2. An installed Fix8Pro binary package
-3. A supported C++ compiler and biuld environment
+1. An installed Fix8Pro binary package
 
 ## To build
 ```bash
