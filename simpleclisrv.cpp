@@ -60,16 +60,16 @@ using namespace std;
 using namespace cxxopts;
 using namespace FIX8;
 
-//-------------------------------------------------------------------------------------------------
-#include "FIX44_EXAMPLE_types.hpp"
-#include "FIX44_EXAMPLE_router.hpp"
-#include "FIX44_EXAMPLE_classes.hpp"
+//-----------------------------------------------------------------------------------------
+#include "FIX42_EXAMPLE_types.hpp"
+#include "FIX42_EXAMPLE_router.hpp"
+#include "FIX42_EXAMPLE_classes.hpp"
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
 class SimpleSession;
 
 /// universal inbound message router for client and server
-class SimpleSessionRouter : public FIX44_EXAMPLE::FIX44_EXAMPLE_Router
+class SimpleSessionRouter final : public FIX42_EXAMPLE::FIX42_EXAMPLE_Router
 {
 	SimpleSession& _session;
 
@@ -80,14 +80,14 @@ public:
 
 	/*! Execution report handler. For client
 	    \param msg Execution report message session */
-	bool operator()(const FIX44_EXAMPLE::ExecutionReport *msg) const override;
+	bool operator()(const FIX42_EXAMPLE::ExecutionReport *msg) const override;
 
 	/*! NewOrderSingle message handler. For server
 	    \param msg NewOrderSingle message */
-	bool operator()(const FIX44_EXAMPLE::NewOrderSingle *msg) const override;
+	bool operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const override;
 };
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
 /// universal session for client and server
 class SimpleSession final : public Session
 {
@@ -108,7 +108,7 @@ public:
 	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
 };
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
 	f8String libdir;
@@ -129,7 +129,7 @@ public:
 	friend class SimpleSession;
 };
 
-//-------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
 Fix8ProApplicationInstance(Application, "simpleclisrv", "(your copyright string)", "Fix8Pro sample client/server");
 bool Application::quiet;
@@ -173,7 +173,7 @@ int Application::main(const vector<f8String>& args)
 
 		void *handle{};
 		f8String errstr;
-		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX44", libdir, handle, errstr) };
+		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX42", libdir, handle, errstr) };
 		if (!ctxfunc)
 		{
 			cerr << errstr << endl;
@@ -228,15 +228,18 @@ int Application::main(const vector<f8String>& args)
 	}
 	catch (const f8Exception& e)
 	{
-		cerr << "exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		cerr << "f8Exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		return 1;
 	}
 	catch (const exception& e)
 	{
-		cerr << "exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		cerr << "std::exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		return 1;
 	}
 	catch (...)
 	{
 		cerr << "unknown exception" << endl;
+		return 1;
 	}
 
 	if (term_received)
@@ -290,9 +293,7 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_sent)),
 		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_received))
 	};
-	{
-		cout << state_colours[before] << " => " << state_colours[after] << endl;
-	}
+	cout << state_colours[before] << " => " << state_colours[after] << endl;
 	if (before == States::st_logon_sent && after == States::st_logoff_received) // force reliable client to try again even though normal exit was detected
 		set_exit_state(false);
 	else if (before == States::st_logoff_received && after == States::st_logoff_sent_and_received && _connection_role == ConnectionRole::cn_acceptor)
@@ -301,13 +302,13 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const FIX44_EXAMPLE::ExecutionReport *msg) const
+bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::ExecutionReport *msg) const
 {
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const FIX44_EXAMPLE::NewOrderSingle *msg) const
+bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const
 {
 	return true;
 }

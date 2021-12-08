@@ -62,6 +62,7 @@ macro(add_gen_library shared name xml extra_fields)
 			${prefix}/${name}_types.cpp
 			${prefix}/${name}_classes.hpp
 			${prefix}/${name}_types.hpp
+			${prefix}/${name}_phrases.cpp
 			COMMAND ${CMAKE_COMMAND} -E env FIX8PRO_LICENSE_FILE=${FIX8PRO_LICENSE_FILE} LD_LIBRARY_PATH=${FIX8PRO_ROOT}/lib ${FIX8PRO_ROOT}/bin/f8pc ${args}
 			MAIN_DEPENDENCY ${xml}
 			WORKING_DIRECTORY ${prefix}
@@ -74,6 +75,7 @@ macro(add_gen_library shared name xml extra_fields)
 				${prefix}/${name}_types.cpp
 				${prefix}/${name}_classes.hpp
 				${prefix}/${name}_types.hpp
+				${prefix}/${name}_phrases.cpp
 				)
 		target_compile_definitions(${libname} PRIVATE BUILD_F8_${name}_API)
 	else()
