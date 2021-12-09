@@ -1,112 +1,71 @@
 <?xml version='1.0' encoding='ISO-8859-1'?>
+<!--
+    ____                      __      ____
+   /\  _`\   __             /'_ `\   /\  _`\
+   \ \ \L\_\/\_\    __  _  /\ \L\ \  \ \ \L\ \ _ __    ___
+    \ \  _\/\/\ \  /\ \/'\ \/_> _ <_  \ \ ,__//\`'__\ / __`\
+     \ \ \/  \ \ \ \/>  </   /\ \L\ \  \ \ \/ \ \ \/ /\ \L\ \
+      \ \_\   \ \_\ /\_/\_\  \ \____/   \ \_\  \ \_\ \ \____/
+       \/_/    \/_/ \//\/_/   \/___/     \/_/   \/_/  \/___/
+
+               Fix8Pro FIX Engine and Framework
+
+Copyright (C) 2010-21 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
+All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
+
+This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 2.  You can
+redistribute  it  and / or modify  it under the  terms of  the  GNU Lesser  General  Public
+License as  published  by  the Free  Software Foundation,  either version 2 of the License,
+or (at your option) any later version.
+
+This file is distributed in the hope that it will be useful, but  WITHOUT ANY WARRANTY  and
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+You should  have received a copy of  the GNU Lesser General Public  License along with this
+file. If not, see <http://www.gnu.org/licenses/>.
+
+BECAUSE THE PROGRAM IS  LICENSED FREE OF  CHARGE, THERE IS NO  WARRANTY FOR THE PROGRAM, TO
+THE EXTENT  PERMITTED  BY  APPLICABLE  LAW.  EXCEPT WHEN  OTHERWISE  STATED IN  WRITING THE
+COPYRIGHT HOLDERS AND/OR OTHER PARTIES  PROVIDE THE PROGRAM "AS IS" WITHOUT WARRANTY OF ANY
+KIND,  EITHER EXPRESSED   OR   IMPLIED,  INCLUDING,  BUT   NOT  LIMITED   TO,  THE  IMPLIED
+WARRANTIES  OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.  THE ENTIRE RISK AS TO
+THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU. SHOULD THE PROGRAM PROVE DEFECTIVE,
+YOU ASSUME THE COST OF ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
+
+IN NO EVENT UNLESS REQUIRED  BY APPLICABLE LAW  OR AGREED TO IN  WRITING WILL ANY COPYRIGHT
+HOLDER, OR  ANY OTHER PARTY  WHO MAY MODIFY  AND/OR REDISTRIBUTE  THE PROGRAM AS  PERMITTED
+ABOVE,  BE  LIABLE  TO  YOU  FOR  DAMAGES,  INCLUDING  ANY  GENERAL, SPECIAL, INCIDENTAL OR
+CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM (INCLUDING BUT
+NOT LIMITED TO LOSS OF DATA OR DATA BEING RENDERED INACCURATE OR LOSSES SUSTAINED BY YOU OR
+THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF SUCH
+HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+-->
+
 <fix8>
 	<default role="initiator"
-				fix_version="1100"
+				fix_version="4200"
 				session_log="session_log_file"
-				no_session_log="session_log_log4cxx"
 				protocol_log="protocol_log_file"
 				login_retry_interval="3000"
 				reset_sequence_numbers="false"
-				connect_timeout="3"
-				default_appl_ver_id="9"
+				connect_timeout="0"
 				heartbeat_interval="10"
 				tcp_nodelay="true"
 				always_seqnum_assign="false"
-				_server_group="FO_Group0"
 				process_model="threaded"
 				enforce_compids="false"
-				login_retries="5"
+				login_retries="0"
 				tabsize="3"
 				ipersist="file1"
 				decoder="canonical"
 				persist="file0" />
 
-	<session name="DLD1"
-				sender_comp_id="DLD_TEX"
-				target_comp_id="TEX1_DLD"
+	<session name="CLI"
+				sender_comp_id="CLI_SRV"
+				target_comp_id="SRV_CLI"
 				endpoint="tcp://127.0.0.1:11001"
-				supplementals="Set1"
 				permissive_mode="true"
 				active="true"/>
-
-	<session name="DLD2"
-				sender_comp_id="DLD2_TEX"
-				target_comp_id="TEX2_DLD2"
-				supplementals="Set1"
-				endpoint="tcp://127.0.0.1:11002"
-				permissive_mode="true"
-				active="true" />
-
-	<session name="DLD3"
-				sender_comp_id="DLD3_TEX"
-				target_comp_id="TEX_DLD3"
-				endpoint="tcp://127.0.0.1:11001"
-				supplementals="Set1"
-				permissive_mode="true"
-				active="true"/>
-
-	<session name="DLD3_NO"
-				sender_comp_id="DLD_TEX"
-				target_comp_id="TEX_DLD1"
-				endpoint="tcp://127.0.0.1:11001"
-				supplementals="Set1"
-				permissive_mode="true"
-				active="true"/>
-
-	<session name="DLD5"
-				sender_comp_id="DLD5_TEX"
-				target_comp_id="TEX2_DLD5"
-				supplementals="Set1"
-				endpoint="tcp://127.0.0.1:11001"
-				permissive_mode="true"
-				active="true" />
-
-	<session name="DLD4"
-				sender_comp_id="DLD4_TEX"
-				target_comp_id="TEX2_DLD4"
-				supplementals="Set1"
-				endpoint="tcp://127.0.0.1:11001"
-				permissive_mode="true"
-				active="true" />
-
-	<session name="DLD6"
-				sender_comp_id="DLD_TEX"
-				target_comp_id="TEX6_DLD"
-				endpoint="tcp://127.0.0.1:11006"
-				supplementals="Set1"
-				permissive_mode="true"
-				process_model="coroutine"
-				active="true"/>
-
-	<session name="DLD7"
-				sender_comp_id="DLD2_TEX"
-				target_comp_id="TEX7_DLD7"
-				supplementals="Set1"
-				endpoint="tcp://127.0.0.1:11007"
-				permissive_mode="true"
-				process_model="coroutine"
-				active="true" />
-
-	<session name="DLD8"
-				sender_comp_id="DLD8_TEX"
-				target_comp_id="TEX8_DLD8"
-				supplementals="Set1"
-				endpoint="tcp://127.0.0.1:11008"
-				permissive_mode="true"
-				process_model="coroutine"
-				active="true" />
-
-	<schedule name="reset_schedule01"
-				start_time="22:00:00"
-				end_time="22:01:00"
-				start_day="0"
-				end_day="0"
-				utc_offset_mins="auto" />
-
-	<supplementals name="Set1">
-		<field number='9999' name='SampleUserField'  type='STRING' messages='NewOrderSingle:N ExecutionReport:N OrderCancelRequest:Y' />
-		<field number='9991' name='SampleUserField2' type='STRING' messages='NewOrderSingle:N ExecutionReport:N OrderCancelRequest:Y' />
-	</supplementals>
 
 	<persist name="file0"
             type="file" dir="./run"
@@ -120,82 +79,19 @@
             rotation="5"
             db="inbound_client" />
 
-	<persist name="bdb0"
-				type="bdb" dir="./run"
-				db="myfix_client.db" />
-
-	<persist name="mem0"
-				type="memory" />
-
-	<log 		name="pipe"
-				type="pipe"
-				filename="|/bin/cat"
-				rotation="5"
-				flags="timestamp|sequence|thread"/>
-
-	<log 		name="session_log_log4cxx"
-				type="log4cxx"
-				logger="mysession"
-				levels="debug|info|warn|error|fatal"
-				flags="sequence|timestamp|sstart|thread|location|level"/>
-
 	<log 		name="session_log_file"
 				type="file"
-				filename="./run/myfix_client_session.log"
+				filename="./run/client_session_%{DATE}.log;latest_client_session.log"
 				rotation="5"
 				levels="debug|info|warn|error|fatal"
 				flags="sequence|timestamp|sstart|thread|location|level"/>
-
-	<log 		name="session_log_udp"
-				type="broadcast"
-				filename="udp://127.0.0.1:51000"
-				rotation="5"
-				flags="timestamp|sequence|thread"/>
-
-	<log 		name="protocol_log_udp"
-				type="broadcast"
-				filename="udp://127.0.0.1:514"
-				flags="sequence|append|direction|inbound|outbound"/>
-
-	<log 		name="protocol_log_with_attributes"
-				type="file"
-				filename="./run/myfix_client_protocol.log"
-				rotation="5"
-				flags="sequence|append|direction|compress|inbound|outbound"/>
-
-	<log 		name="protocol_log_pipe"
-				type="pipe"
-				filename="|/bin/cat"
-				rotation="5"
-				flags="append|inbound"/>
-
-	<log 		name="smtp_log"
-				type="smtp"
-				levels="fatal"
-				flags="sequence|timestamp|thread|location|level"
-				from="anon@electro.mine.nu"
-				to="David Dight &lt;davidd@electro.mine.nu&gt;"
-				cc="davidd@computer.org,davidd@fix8mt.com"
-				smtp_server="smtp://pukha:587"
-				username="davidd"
-				pw="cmFkYStrcmlzaG5h"
-				subject="Example log email"/>
 
 	<log 		name="protocol_log_file"
 				type="file"
 				levels="debug|info|warn|error|fatal"
-				filename="./run/myfix_client_protocol.log"
+				filename="./run/client_protocol_%{DATE}.log;latest_client_protocol.log"
 				rotation="5"
 				flags_old="append|inbound|outbound|direction|sequence"
 				flags="append|inbound|outbound"/>
-
-	<server_group name="FO_Group0">
-		<server name="Host_01" ip="192.168.1.121" port="12345" max_retries="3"/>
-		<server name="Host_02" endpoint="tcp://192.168.1.122:12345" max_retries="3"/>
-		<server name="Host_04" ip="192.168.1.124" port="12345" max_retries="3"/>
-		<server name="Host_05" ip="192.168.1.125" port="12345" max_retries="3"/>
-		<server name="Host_06" ip="127.0.0.1" port="11001" max_retries="3"/>
-		<server name="Host_03" ip="192.168.1.123" port="12345" max_retries="3" active="false"/>
-	</server_group>
 
 </fix8>

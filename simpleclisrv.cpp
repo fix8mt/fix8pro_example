@@ -47,6 +47,7 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <vector>
 #include <iterator>
 #include <typeinfo>
+#include <random>
 
 // f8 headers
 #include <fix8pro/f8includes.hpp>
@@ -56,14 +57,14 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #define COLOUR(x,y,z) Colours::make_string16({Attribute::x, Colour::y},z,Application::use_colour())
 
 //-----------------------------------------------------------------------------------------
+#include <FIX42_EXAMPLE_types.hpp>
+#include <FIX42_EXAMPLE_router.hpp>
+#include <FIX42_EXAMPLE_classes.hpp>
+
+//-----------------------------------------------------------------------------------------
 using namespace std;
 using namespace cxxopts;
 using namespace FIX8;
-
-//-----------------------------------------------------------------------------------------
-#include "FIX42_EXAMPLE_types.hpp"
-#include "FIX42_EXAMPLE_router.hpp"
-#include "FIX42_EXAMPLE_classes.hpp"
 
 //-----------------------------------------------------------------------------------------
 class SimpleSession;
@@ -105,6 +106,7 @@ public:
 	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
 	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
 	void print_message(const MessagePtr& msg, ostream& os, bool usecolour) const override;
+	void on_send_success(const MessagePtr& msg) const override;
 	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
 };
 
@@ -116,6 +118,7 @@ class Application final : public Fix8ProApplication
 	bool server, reliable, hb;
 	f8String clcf, global_logger_name, sses, cses, libpath;
 	unsigned next_send, next_receive;
+	static mt19937_64 eng;
 
 	static bool quiet;
 
@@ -127,21 +130,23 @@ public:
 	bool options_setup(cxxopts::Options& ops) override;
 
 	friend class SimpleSession;
+	friend class SimpleSessionRouter;
 };
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
 Fix8ProApplicationInstance(Application, "simpleclisrv", "(your copyright string)", "Fix8Pro sample client/server");
 bool Application::quiet;
+mt19937_64 Application::eng(time(0));
 
 //-----------------------------------------------------------------------------------------
 bool Application::options_setup(Options& ops)
 {
 	ops.add_options()
-		("c,config", "xml config (default: myfix_client.xml or myfix_server.xml)", value<f8String>(clcf))
-		("l,log", "global log filename", value<f8String>(global_logger_name)->default_value("simpleclisrv.log"))
-		("V,serversession", "name of server session profile to use", value<f8String>(sses)->default_value("TEX1"))
-		("C,clientsession", "name of client session profile to use", value<f8String>(cses)->default_value("DLD1"))
+		("c,config", "xml config (default: simple_client.xml or simple_server.xml)", value<f8String>(clcf))
+		("l,log", "global log filename", value<f8String>(global_logger_name)->default_value("global.log"))
+		("V,serversession", "name of server session profile to use", value<f8String>(sses)->default_value("SRV"))
+		("C,clientsession", "name of client session profile to use", value<f8String>(cses)->default_value("CLI"))
 		("q,quiet", "do not print fix output", value<bool>(quiet)->default_value("false"))
 		("R,receive", "set next expected receive sequence number", value<unsigned>(next_receive)->default_value("0"))
 		("S,send", "set next expected send sequence number", value<unsigned>(next_send)->default_value("0"))
@@ -151,9 +156,8 @@ bool Application::options_setup(Options& ops)
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(libdir))
 		("s,server", "run in server mode (default client mode)", value<bool>(server)->default_value("false"));
 	add_postamble(R"(e.g.
-simpleclisrv -c config/myfix_client.xml -r -C DLD2
-simpleclisrv -c config/myfix_client.xml -r
-simpleclisrv -c config/myfix_server.xml -s)");
+  simpleclisrv -c config/simple_client.xml -r
+  simpleclisrv -c config/simple_server.xml -s)");
 	return true;
 }
 
@@ -163,7 +167,7 @@ int Application::main(const vector<f8String>& args)
 	try
 	{
 		if (clcf.empty())
-			clcf = server ? "myfix_server.xml" : "myfix_client.xml";
+			clcf = server ? "simple_client.xml" : "simple_server.xml";
 		if (!exist(clcf))
 		{
 			cerr << "configuration file " << clcf << " does not exist" << endl;
@@ -182,13 +186,14 @@ int Application::main(const vector<f8String>& args)
 		cout << "loaded: " << (libpath = libp) << endl;
 
 		Fix8Pro::base_application_thread_name("clisrv");
-		Fix8ProInstance instance(1, global_logger_name.c_str()); // warms up timer, logmanager
+		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_" + global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
+		Fix8ProInstance instance{1, glogname.c_str()}; // warms up timer, logmanager
 
 		if (server)
 		{
 			unique_ptr<ServerSessionBase> ms(make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses));
 
-			for (unsigned scnt(0); !term_received; )
+			for (unsigned scnt{}; !term_received; )
 			{
 				if (!ms->poll())
 					continue;
@@ -198,8 +203,9 @@ int Application::main(const vector<f8String>& args)
 					ses->control() |= (hb ? Session::print : Session::printnohb);
 				cout << "client(" << ++scnt << ") connection established." << endl;
 				inst->start(false, next_send, next_receive);
-				cout << endl;
-				hypersleep(1s);
+				while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
+					&& ses->get_connection()->is_connected() && !term_received)
+						hypersleep(1s);
 				ses->request_stop();
 				cout << "Session(" << scnt << ") finished. Waiting for new connection..." << endl;
 			}
@@ -208,11 +214,10 @@ int Application::main(const vector<f8String>& args)
 		{
 			unique_ptr<ClientSessionBase> mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
 																	: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
-			auto *ses { static_cast<SimpleSession*>(mc->session_ptr()) };
 			if (!quiet)
-				ses->control() |= (hb ? Session::print : Session::printnohb);
+				mc->session_ptr()->control() |= (hb ? Session::print : Session::printnohb);
 
-			const LoginParameters& lparam(ses->get_login_parameters());
+			const LoginParameters& lparam(mc->session_ptr()->get_login_parameters());
 			if (!reliable)
 				mc->start(false, next_send, next_receive, lparam._davi);
 			else
@@ -220,10 +225,41 @@ int Application::main(const vector<f8String>& args)
 				cout << "starting reliable client" << endl;
 				mc->start(false, next_send, next_receive, lparam._davi);
 			}
-			cout << endl;
+			cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
+			char ch;
+			while (!term_received)
+			{
+				timeval tv{5};
+				fd_set rfds;
+				FD_ZERO(&rfds);
+				FD_SET(0, &rfds);
+				if (select(1, &rfds, 0, 0, &tv) > 0 && read(0, &ch, 1) > 0)
+				{
+					if (ch == 'l')
+					{
+						mc->session_ptr()->logout_and_shutdown("goodbye");
+						break;
+					}
+					else if (ch == 'q')
+						break;
+					else if (ch == 'x')
+						exit(1);
+				}
+				static unsigned oid{};
+				auto nos(make_message<FIX42_EXAMPLE::NewOrderSingle>());
+				*nos << nos->make_field<FIX42_EXAMPLE::TransactTime>()
+					  << nos->make_field<FIX42_EXAMPLE::ClOrdID>("ord" + to_string(++oid))
+					  << nos->make_field<FIX42_EXAMPLE::HandlInst>(FIX42_EXAMPLE::HandlInst_AutomatedExecutionNoIntervention)
+					  << nos->make_field<FIX42_EXAMPLE::OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
+					  << nos->make_field<FIX42_EXAMPLE::Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
+					  << nos->make_field<FIX42_EXAMPLE::Symbol>("NYSE::IBM")
+					  << nos->make_field<FIX42_EXAMPLE::OrdType>(FIX42_EXAMPLE::OrdType_Limit)
+					  << nos->make_field<FIX42_EXAMPLE::Side>(uniform_int_distribution<int>(0, 1)(eng) ? FIX42_EXAMPLE::Side_Buy : FIX42_EXAMPLE::Side_Sell)
+					  << nos->make_field<FIX42_EXAMPLE::TimeInForce>(FIX42_EXAMPLE::TimeInForce_FillOrKill);
+				mc->session_ptr()->send(move(nos));
+			}
 
-			hypersleep(1s);
-			ses->request_stop();
+			mc->session_ptr()->request_stop();
 		}
 	}
 	catch (const f8Exception& e)
@@ -251,7 +287,7 @@ int Application::main(const vector<f8String>& args)
 //-----------------------------------------------------------------------------------------
 bool SimpleSession::handle_application(unsigned seqnum, MessagePtr& msg)
 {
-	return !enforce(seqnum, msg);
+	return enforce(seqnum, msg) || msg->process(_router);
 }
 
 //-----------------------------------------------------------------------------------------
@@ -268,7 +304,23 @@ void SimpleSession::print_message(const MessagePtr& msg, ostream& os, bool useco
 	{
 		static const f8String rule { f8String(20, '-') + " received " + f8String(20, '-') };
 		cout << '\r' << rule << endl;
-		Session::print_message(msg, cout, usecolour);
+		Session::print_message(msg, cout, Application::use_colour());
+	}
+}
+
+//-----------------------------------------------------------------------------------------
+void SimpleSession::on_send_success(const MessagePtr& msg) const
+{
+	if (!Application::quiet)
+	{
+		if (_control & Session::printnohb && msg->get_msgtype() == F8FIX(MsgType_HEARTBEAT))
+			;
+		else
+		{
+			static const f8String rule { f8String(22, '-') + " sent " + f8String(22, '-') };
+			cout << '\r' << rule << endl;
+			Session::print_message(msg, cout, Application::use_colour());
+		}
 	}
 }
 
@@ -293,11 +345,14 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_sent)),
 		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_received))
 	};
-	cout << state_colours[before] << " => " << state_colours[after] << endl;
+	cout << state_colours[before] << " => " << state_colours[after];
+	if (where)
+		cout << " (" << where << ')';
+	cout << endl;
 	if (before == States::st_logon_sent && after == States::st_logoff_received) // force reliable client to try again even though normal exit was detected
 		set_exit_state(false);
 	else if (before == States::st_logoff_received && after == States::st_logoff_sent_and_received && _connection_role == ConnectionRole::cn_acceptor)
-		logout_and_shutdown("");
+		logout_and_shutdown("goodbye");
 }
 
 //-----------------------------------------------------------------------------------------
@@ -310,5 +365,44 @@ bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::ExecutionReport *msg) 
 //-----------------------------------------------------------------------------------------
 bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const
 {
+	static unsigned oid{}, eoid{};
+	FIX42_EXAMPLE::OrderQty::this_type qty { msg->get<FIX42_EXAMPLE::OrderQty>()->get() };
+	FIX42_EXAMPLE::Price::this_type price { msg->get<FIX42_EXAMPLE::Price>()->get() };
+	auto er{make_message<FIX42_EXAMPLE::ExecutionReport>()};
+	MessageBasePtr erb{detail::static_pointer_cast(er)};
+	msg->copy_legal(erb);
+
+	*er << er->make_field<FIX42_EXAMPLE::OrderID>("ord" + to_string(++oid))
+		 << er->make_field<FIX42_EXAMPLE::ExecID>("exec" + to_string(++eoid))
+		 << er->make_field<FIX42_EXAMPLE::ExecType>(FIX42_EXAMPLE::ExecType_New)
+		 << er->make_field<FIX42_EXAMPLE::OrdStatus>(FIX42_EXAMPLE::OrdStatus_New)
+		 << er->make_field<FIX42_EXAMPLE::ExecTransType>(FIX42_EXAMPLE::ExecTransType_New)
+		 << er->make_field<FIX42_EXAMPLE::LeavesQty>(qty)
+		 << er->make_field<FIX42_EXAMPLE::CumQty>(0.)
+		 << er->make_field<FIX42_EXAMPLE::AvgPx>(0.)
+		 << er->make_field<FIX42_EXAMPLE::LastCapacity>('4');
+	_session.send(move(er));
+
+	FIX42_EXAMPLE::OrderQty::this_type remaining_qty{qty}, cum_qty{};
+	while (remaining_qty > 0)
+	{
+		auto trdqty{uniform_int_distribution<int>(1, remaining_qty)(Application::eng)};
+		er = make_message<FIX42_EXAMPLE::ExecutionReport>();
+		MessageBasePtr erb{detail::static_pointer_cast(er)};
+		msg->copy_legal(erb);
+		cum_qty += trdqty;
+		*er << er->make_field<FIX42_EXAMPLE::OrderID>("ord" + to_string(oid))
+			 << er->make_field<FIX42_EXAMPLE::ExecID>("exec" + to_string(++eoid))
+			 << er->make_field<FIX42_EXAMPLE::ExecType>(FIX42_EXAMPLE::ExecType_New)
+			 << er->make_field<FIX42_EXAMPLE::OrdStatus>(remaining_qty == trdqty ? FIX42_EXAMPLE::OrdStatus_Filled : FIX42_EXAMPLE::OrdStatus_PartiallyFilled)
+			 << er->make_field<FIX42_EXAMPLE::LeavesQty>(remaining_qty - trdqty)
+			 << er->make_field<FIX42_EXAMPLE::ExecTransType>(FIX42_EXAMPLE::ExecTransType_New)
+			 << er->make_field<FIX42_EXAMPLE::CumQty>(cum_qty)
+			 << er->make_field<FIX42_EXAMPLE::LastShares>(trdqty)
+			 << er->make_field<FIX42_EXAMPLE::AvgPx>(price);
+		_session.send(move(er));
+		remaining_qty -= trdqty;
+	}
 	return true;
 }
+
