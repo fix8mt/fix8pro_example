@@ -25,3 +25,25 @@ cmake -DFIX8PRO_LICENSE_FILE=<path to license file> -DFIX8PRO_ROOT=<path to inst
 make install
 ```
 
+## To setup your run environment
+1. Add your Fix8Pro binary and library installation directories to your `$PATH` and `$LD_LIBRARY_PATH`
+```bash
+export PATH=$PATH:<path of your Fix8Pro bin directory>
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path of your Fix8Pro lib directory>
+```
+1. Set your `$FIX8PRO_LICENSE_FILE` environment variable
+```bash
+export FIX8PRO_LICENSE_FILE=<path of your xml license file>
+```
+
+## To run
+This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the ./build directory.
+In one temrinal we'll run our server:
+```bash
+./simpleclisrv -c ../config/simple_server.xml -s
+```
+In our other temrinal we'll run our client:
+```bash
+./simpleclisrv -c ../config/simple_client.xml
+```
+
