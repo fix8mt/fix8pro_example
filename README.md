@@ -26,24 +26,28 @@ make install
 ```
 
 ## To setup your run environment
-1. Add your Fix8Pro binary and library installation directories to your `$PATH` and `$LD_LIBRARY_PATH`
+1. Add your Fix8Pro binary and library installation directories to your `$PATH` and `$LD_LIBRARY_PATH`.
+For example, if you installed Fix8Pro to `/opt/fix8pro`:
 ```bash
-export PATH=$PATH:<path of your Fix8Pro bin directory>
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path of your Fix8Pro lib directory>
+export PATH=$PATH:/opt/fix8pro/bin
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/fix8pro/lib
 ```
-1. Set your `$FIX8PRO_LICENSE_FILE` environment variable
+2. Set your `$FIX8PRO_LICENSE_FILE` environment variable.
+For example, if your license file is in `/opt/fix8pro`:
 ```bash
-export FIX8PRO_LICENSE_FILE=<path of your xml license file>
+export FIX8PRO_LICENSE_FILE=/opt/fix8pro/mylic.xml
 ```
 
 ## To run
-This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the ./build directory.
-In one temrinal we'll run our server:
+This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the `./build` directory.
+In one terminal we'll run our server:
 ```bash
 ./simpleclisrv -c ../config/simple_server.xml -s
 ```
-In our other temrinal we'll run our client:
+In our other terminal we'll run our client:
 ```bash
 ./simpleclisrv -c ../config/simple_client.xml
 ```
+- When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
+- From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
