@@ -201,13 +201,13 @@ int Application::main(const vector<f8String>& args)
 				auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) };
 				if (!quiet)
 					ses->control() |= (hb ? Session::print : Session::printnohb);
-				cout << "client(" << ++scnt << ") connection established." << endl;
+				cout << "Client session(" << ++scnt << ") connection established." << endl;
 				inst->start(false, next_send, next_receive);
 				while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 					&& ses->get_connection()->is_connected() && !term_received)
 						hypersleep(1s);
 				ses->request_stop();
-				cout << "Session(" << scnt << ") finished. Waiting for new connection..." << endl;
+				cout << "Client session(" << scnt << ") finished. Waiting for new connection..." << endl;
 			}
 		}
 		else
@@ -285,6 +285,7 @@ int Application::main(const vector<f8String>& args)
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
+// this is way we typically handle application messages
 bool SimpleSession::handle_application(unsigned seqnum, MessagePtr& msg)
 {
 	return enforce(seqnum, msg) || msg->process(_router);
@@ -359,12 +360,14 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 //-----------------------------------------------------------------------------------------
 bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::ExecutionReport *msg) const
 {
+	// client processing for received ERs
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
 bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const
 {
+	// server processing for received NOSs
 	static unsigned oid{}, eoid{};
 	FIX42_EXAMPLE::OrderQty::this_type qty { msg->get<FIX42_EXAMPLE::OrderQty>()->get() };
 	FIX42_EXAMPLE::Price::this_type price { msg->get<FIX42_EXAMPLE::Price>()->get() };
