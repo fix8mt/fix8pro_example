@@ -2,7 +2,7 @@
   <a href="https://www.fix8mt.com"><img src="fix8mt_Master_Logo_Green_Trans.png" width="200"></a>
 </p>
 
-# Fix8pro C++ example
+# Fix8Pro C++ example
 Simple example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
 ## To download
