@@ -52,8 +52,11 @@ In our other terminal we'll run our client:
 - When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
+<details><summary>Sample output - server</summary>
+<p>
+
 ```bash
-[master=] ~/prog/fix8pro_example/build:15119>./simpleclisrv -c ../config/simple_server.xml -s
+% ./simpleclisrv -c ../config/simple_server.xml -s
 loaded: libFIX42d.so
 Client session(1) connection established.
 none => wait_for_logon (../runtime/session.cpp:250)
@@ -533,11 +536,17 @@ logoff_sent_and_received => session_terminated (../runtime/session.cpp:358)
 Client session(1) finished. Waiting for new connection...
 ^C*** Interrupt(2) ***
 terminated.
-[master=] ~/prog/fix8pro_example/build:15120>ls
+%
 ```
 
+</p>
+</details>
+
+<details><summary>Sample output - client</summary>
+<p>
+
 ```bash
-[master=] ~/prog/fix8pro_example/build:14567>./simpleclisrv -c ../config/simple_client.xml
+% ./simpleclisrv -c ../config/simple_client.xml
 loaded: libFIX42d.so
 starting reliable client
 Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit
@@ -1017,5 +1026,8 @@ trailer ("trailer")
    CheckSum (10)                      058
 logoff_sent => logoff_received (../runtime/session.cpp:1063)
 logoff_received => session_terminated (../runtime/session.cpp:358)
-[master=] ~/prog/fix8pro_example/build:14568>
+%
 ```
+
+</p>
+</details>
