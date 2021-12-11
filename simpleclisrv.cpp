@@ -65,12 +65,13 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 using namespace std;
 using namespace cxxopts;
 using namespace FIX8;
+using namespace FIX42_EXAMPLE;
 
 //-----------------------------------------------------------------------------------------
 class SimpleSession;
 
 /// universal inbound message router for client and server
-class SimpleSessionRouter final : public FIX42_EXAMPLE::FIX42_EXAMPLE_Router
+class SimpleSessionRouter final : public FIX42_EXAMPLE_Router
 {
 	SimpleSession& _session;
 
@@ -81,11 +82,11 @@ public:
 
 	/*! Execution report handler. For client
 	    \param msg Execution report message session */
-	bool operator()(const FIX42_EXAMPLE::ExecutionReport *msg) const override;
+	bool operator()(const ExecutionReport *msg) const override;
 
 	/*! NewOrderSingle message handler. For server
 	    \param msg NewOrderSingle message */
-	bool operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const override;
+	bool operator()(const NewOrderSingle *msg) const override;
 };
 
 //-----------------------------------------------------------------------------------------
@@ -173,11 +174,11 @@ int Application::main(const vector<f8String>& args)
 			cerr << "configuration file " << clcf << " does not exist" << endl;
 			return 1;
 		}
-		unique_ptr<istream> istr { make_unique<ifstream>(clcf.c_str()) };
+		unique_ptr<istream> istr { make_unique<ifstream>(clcf.c_str()) }; // our config file as a stream
 
 		void *handle{};
 		f8String errstr;
-		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX42", libdir, handle, errstr) };
+		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX42", libdir, handle, errstr) }; // load our FIX schema .so
 		if (!ctxfunc)
 		{
 			cerr << errstr << endl;
@@ -187,7 +188,7 @@ int Application::main(const vector<f8String>& args)
 
 		Fix8Pro::base_application_thread_name("clisrv");
 		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_" + global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
-		Fix8ProInstance instance{1, glogname.c_str()}; // warms up timer, logmanager
+		Fix8ProInstance instance{1, glogname.c_str()}; // warms up timer, setup logmanager, global logger
 
 		if (server)
 		{
@@ -195,14 +196,14 @@ int Application::main(const vector<f8String>& args)
 
 			for (unsigned scnt{}; !term_received; )
 			{
-				if (!ms->poll())
+				if (!ms->poll()) // default timeout 250ms
 					continue;
-				unique_ptr<SessionInstanceBase> inst(ms->create_server_instance());
+				unique_ptr<SessionInstanceBase> inst(ms->create_server_instance()); // we have a new session
 				auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) };
 				if (!quiet)
 					ses->control() |= (hb ? Session::print : Session::printnohb);
 				cout << "Client session(" << ++scnt << ") connection established." << endl;
-				inst->start(false, next_send, next_receive);
+				inst->start(false, next_send, next_receive); // when false, session starts and control returns immediately
 				while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 					&& ses->get_connection()->is_connected() && !term_received)
 						hypersleep(1s);
@@ -222,8 +223,8 @@ int Application::main(const vector<f8String>& args)
 				mc->start(false, next_send, next_receive, lparam._davi);
 			else
 			{
-				cout << "starting reliable client" << endl;
-				mc->start(false, next_send, next_receive, lparam._davi);
+				cout << "starting reliable client" << endl; // reliable is default
+				mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
 			}
 			cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
 			char ch;
@@ -246,16 +247,16 @@ int Application::main(const vector<f8String>& args)
 						exit(1);
 				}
 				static unsigned oid{};
-				auto nos(make_message<FIX42_EXAMPLE::NewOrderSingle>());
-				*nos << nos->make_field<FIX42_EXAMPLE::TransactTime>()
-					  << nos->make_field<FIX42_EXAMPLE::ClOrdID>("ord" + to_string(++oid))
-					  << nos->make_field<FIX42_EXAMPLE::HandlInst>(FIX42_EXAMPLE::HandlInst_AutomatedExecutionNoIntervention)
-					  << nos->make_field<FIX42_EXAMPLE::OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
-					  << nos->make_field<FIX42_EXAMPLE::Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
-					  << nos->make_field<FIX42_EXAMPLE::Symbol>("NYSE::IBM")
-					  << nos->make_field<FIX42_EXAMPLE::OrdType>(FIX42_EXAMPLE::OrdType_Limit)
-					  << nos->make_field<FIX42_EXAMPLE::Side>(uniform_int_distribution<int>(0, 1)(eng) ? FIX42_EXAMPLE::Side_Buy : FIX42_EXAMPLE::Side_Sell)
-					  << nos->make_field<FIX42_EXAMPLE::TimeInForce>(FIX42_EXAMPLE::TimeInForce_FillOrKill);
+				auto nos(make_message<NewOrderSingle>());
+				*nos << nos->make_field<TransactTime>()
+					  << nos->make_field<ClOrdID>("ord" + to_string(++oid))
+					  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
+					  << nos->make_field<OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
+					  << nos->make_field<Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
+					  << nos->make_field<Symbol>("NYSE::IBM")
+					  << nos->make_field<OrdType>(OrdType_Limit)
+					  << nos->make_field<Side>(uniform_int_distribution<int>(0, 1)(eng) ? Side_Buy : Side_Sell)
+					  << nos->make_field<TimeInForce>(TimeInForce_FillOrKill);
 				mc->session_ptr()->send(move(nos));
 			}
 
@@ -288,10 +289,11 @@ int Application::main(const vector<f8String>& args)
 // this is way we typically handle application messages
 bool SimpleSession::handle_application(unsigned seqnum, MessagePtr& msg)
 {
-	return enforce(seqnum, msg) || msg->process(_router);
+	return enforce(seqnum, msg) || msg->process(_router); // process calls appropriate FIX message handler
 }
 
 //-----------------------------------------------------------------------------------------
+// this allows us to specialise the logon
 MessagePtr SimpleSession::generate_logon(unsigned heartbeat_interval, const f8String davi)
 {
 	auto msg { Session::generate_logon(heartbeat_interval, davi) };
@@ -358,51 +360,51 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::ExecutionReport *msg) const
+bool SimpleSessionRouter::operator()(const ExecutionReport *msg) const
 {
 	// client processing for received ERs
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const FIX42_EXAMPLE::NewOrderSingle *msg) const
+bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
 {
 	// server processing for received NOSs
 	static unsigned oid{}, eoid{};
-	FIX42_EXAMPLE::OrderQty::this_type qty { msg->get<FIX42_EXAMPLE::OrderQty>()->get() };
-	FIX42_EXAMPLE::Price::this_type price { msg->get<FIX42_EXAMPLE::Price>()->get() };
-	auto er{make_message<FIX42_EXAMPLE::ExecutionReport>()};
+	OrderQty::this_type qty { msg->get<OrderQty>()->get() };
+	Price::this_type price { msg->get<Price>()->get() };
+	auto er{make_message<ExecutionReport>()};
 	MessageBasePtr erb{detail::static_pointer_cast(er)};
 	msg->copy_legal(erb);
 
-	*er << er->make_field<FIX42_EXAMPLE::OrderID>("ord" + to_string(++oid))
-		 << er->make_field<FIX42_EXAMPLE::ExecID>("exec" + to_string(++eoid))
-		 << er->make_field<FIX42_EXAMPLE::ExecType>(FIX42_EXAMPLE::ExecType_New)
-		 << er->make_field<FIX42_EXAMPLE::OrdStatus>(FIX42_EXAMPLE::OrdStatus_New)
-		 << er->make_field<FIX42_EXAMPLE::ExecTransType>(FIX42_EXAMPLE::ExecTransType_New)
-		 << er->make_field<FIX42_EXAMPLE::LeavesQty>(qty)
-		 << er->make_field<FIX42_EXAMPLE::CumQty>(0.)
-		 << er->make_field<FIX42_EXAMPLE::AvgPx>(0.)
-		 << er->make_field<FIX42_EXAMPLE::LastCapacity>('4');
+	*er << er->make_field<OrderID>("ord" + to_string(++oid))
+		 << er->make_field<ExecID>("exec" + to_string(++eoid))
+		 << er->make_field<ExecType>(ExecType_New)
+		 << er->make_field<OrdStatus>(OrdStatus_New)
+		 << er->make_field<ExecTransType>(ExecTransType_New)
+		 << er->make_field<LeavesQty>(qty)
+		 << er->make_field<CumQty>(0.)
+		 << er->make_field<AvgPx>(0.)
+		 << er->make_field<LastCapacity>('4');
 	_session.send(move(er));
 
-	FIX42_EXAMPLE::OrderQty::this_type remaining_qty{qty}, cum_qty{};
+	OrderQty::this_type remaining_qty{qty}, cum_qty{};
 	while (remaining_qty > 0)
 	{
 		auto trdqty{uniform_int_distribution<int>(1, remaining_qty)(Application::eng)};
-		er = make_message<FIX42_EXAMPLE::ExecutionReport>();
+		er = make_message<ExecutionReport>();
 		MessageBasePtr erb{detail::static_pointer_cast(er)};
 		msg->copy_legal(erb);
 		cum_qty += trdqty;
-		*er << er->make_field<FIX42_EXAMPLE::OrderID>("ord" + to_string(oid))
-			 << er->make_field<FIX42_EXAMPLE::ExecID>("exec" + to_string(++eoid))
-			 << er->make_field<FIX42_EXAMPLE::ExecType>(FIX42_EXAMPLE::ExecType_New)
-			 << er->make_field<FIX42_EXAMPLE::OrdStatus>(remaining_qty == trdqty ? FIX42_EXAMPLE::OrdStatus_Filled : FIX42_EXAMPLE::OrdStatus_PartiallyFilled)
-			 << er->make_field<FIX42_EXAMPLE::LeavesQty>(remaining_qty - trdqty)
-			 << er->make_field<FIX42_EXAMPLE::ExecTransType>(FIX42_EXAMPLE::ExecTransType_New)
-			 << er->make_field<FIX42_EXAMPLE::CumQty>(cum_qty)
-			 << er->make_field<FIX42_EXAMPLE::LastShares>(trdqty)
-			 << er->make_field<FIX42_EXAMPLE::AvgPx>(price);
+		*er << er->make_field<OrderID>("ord" + to_string(oid))
+			 << er->make_field<ExecID>("exec" + to_string(++eoid))
+			 << er->make_field<ExecType>(ExecType_New)
+			 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus_Filled : OrdStatus_PartiallyFilled)
+			 << er->make_field<LeavesQty>(remaining_qty - trdqty)
+			 << er->make_field<ExecTransType>(ExecTransType_New)
+			 << er->make_field<CumQty>(cum_qty)
+			 << er->make_field<LastShares>(trdqty)
+			 << er->make_field<AvgPx>(price);
 		_session.send(move(er));
 		remaining_qty -= trdqty;
 	}
