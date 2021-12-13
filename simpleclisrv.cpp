@@ -119,16 +119,16 @@ class Application final : public Fix8ProApplication
 	bool server, reliable, hb;
 	f8String clcf, global_logger_name, sses, cses, libpath;
 	unsigned next_send, next_receive;
-	static mt19937_64 eng;
 
+	static mt19937_64 eng;
 	static bool quiet;
+
+	int main(const vector<f8String>& args) override;
+	bool options_setup(cxxopts::Options& ops) override;
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
 	~Application() = default;
-
-	int main(const vector<f8String>& args) override;
-	bool options_setup(cxxopts::Options& ops) override;
 
 	friend class SimpleSession;
 	friend class SimpleSessionRouter;
@@ -157,8 +157,8 @@ bool Application::options_setup(Options& ops)
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(libdir))
 		("s,server", "run in server mode (default client mode)", value<bool>(server)->default_value("false"));
 	add_postamble(R"(e.g.
-  simpleclisrv -c config/simple_client.xml -r
-  simpleclisrv -c config/simple_server.xml -s)");
+  simpleclisrv -c config/simple_server.xml -s
+  simpleclisrv -c config/simple_client.xml)");
 	return true;
 }
 
@@ -188,7 +188,7 @@ int Application::main(const vector<f8String>& args)
 
 		Fix8Pro::base_application_thread_name("clisrv");
 		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_" + global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
-		Fix8ProInstance instance{1, glogname.c_str()}; // warms up timer, setup logmanager, global logger
+		Fix8ProInstance fix8pro_instance(1, glogname.c_str()); // warms up timer, setup logmanager, global logger
 
 		if (server)
 		{
@@ -199,7 +199,7 @@ int Application::main(const vector<f8String>& args)
 				if (!ms->poll()) // default timeout 250ms
 					continue;
 				unique_ptr<SessionInstanceBase> inst(ms->create_server_instance()); // we have a new session
-				auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) };
+				auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) }; // use cast if you need to access specialisations in your session
 				if (!quiet)
 					ses->control() |= (hb ? Session::print : Session::printnohb);
 				cout << "Client session(" << ++scnt << ") connection established." << endl;
@@ -215,10 +215,11 @@ int Application::main(const vector<f8String>& args)
 		{
 			unique_ptr<ClientSessionBase> mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
 																	: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
+			auto *ses { mc->session_ptr() };
 			if (!quiet)
-				mc->session_ptr()->control() |= (hb ? Session::print : Session::printnohb);
+				ses->control() |= (hb ? Session::print : Session::printnohb);
 
-			const LoginParameters& lparam(mc->session_ptr()->get_login_parameters());
+			const LoginParameters& lparam(ses->get_login_parameters());
 			if (!reliable)
 				mc->start(false, next_send, next_receive, lparam._davi);
 			else
@@ -238,7 +239,7 @@ int Application::main(const vector<f8String>& args)
 				{
 					if (ch == 'l')
 					{
-						mc->session_ptr()->logout_and_shutdown("goodbye");
+						ses->logout_and_shutdown("goodbye");
 						break;
 					}
 					else if (ch == 'q')
@@ -257,10 +258,10 @@ int Application::main(const vector<f8String>& args)
 					  << nos->make_field<OrdType>(OrdType_Limit)
 					  << nos->make_field<Side>(uniform_int_distribution<int>(0, 1)(eng) ? Side_Buy : Side_Sell)
 					  << nos->make_field<TimeInForce>(TimeInForce_FillOrKill);
-				mc->session_ptr()->send(move(nos));
+				ses->send(move(nos));
 			}
 
-			mc->session_ptr()->request_stop();
+			ses->request_stop();
 		}
 	}
 	catch (const f8Exception& e)
