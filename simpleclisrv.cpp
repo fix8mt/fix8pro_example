@@ -220,13 +220,9 @@ int Application::main(const vector<f8String>& args)
 				ses->control() |= (hb ? Session::print : Session::printnohb);
 
 			const LoginParameters& lparam(ses->get_login_parameters());
-			if (!reliable)
-				mc->start(false, next_send, next_receive, lparam._davi);
-			else
-			{
+			if (reliable)
 				cout << "starting reliable client" << endl; // reliable is default
-				mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
-			}
+			mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
 			cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
 			char ch;
 			while (!term_received)
