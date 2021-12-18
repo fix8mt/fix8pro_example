@@ -57,6 +57,7 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 				process_model="threaded"
 				enforce_compids="false"
 				silent_disconnect="false"
+				login_retry_interval="1000"
 				persist="file0"/>
 
 	<session name="SRV"

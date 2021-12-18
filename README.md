@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://www.fix8mt.com"><img src="fix8mt_Master_Logo_Green_Trans.png" width="200"></a>
+  <a href="https://www.fix8mt.com"><img src="assets/fix8mt_Master_Logo_Green_Trans.png" width="200"></a>
 </p>
 
 # Fix8Pro C++ example
@@ -1031,3 +1031,20 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 
 </p>
 </details>
+
+<details><summary>Sample screenshot - client</summary>
+<p>
+
+![Shows the client logging out](assets/client_screenshot.png)
+
+</p>
+</details>
+
+<details><summary>Sample screenshot - server</summary>
+<p>
+
+![Shows the server responding to a logout out](assets/server_screenshot.png)
+
+</p>
+</details>
+

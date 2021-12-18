@@ -302,8 +302,8 @@ void SimpleSession::print_message(const MessagePtr& msg, ostream& os, bool useco
 {
 	if (!Application::quiet)
 	{
-		static const f8String rule { f8String(20, '-') + " received " + f8String(20, '-') };
-		cout << '\r' << rule << endl;
+		static const f8String rule { '\r' + f8String(20, '-') + " received " + f8String(20, '-') };
+		cout << rule << '\n';
 		Session::print_message(msg, cout, Application::use_colour());
 	}
 }
@@ -317,8 +317,8 @@ void SimpleSession::on_send_success(const MessagePtr& msg) const
 			;
 		else
 		{
-			static const f8String rule { f8String(22, '-') + " sent " + f8String(22, '-') };
-			cout << '\r' << rule << endl;
+			static const f8String rule { '\r' + f8String(22, '-') + " sent " + f8String(22, '-') };
+			cout << rule << '\n';
 			Session::print_message(msg, cout, Application::use_colour());
 		}
 	}
@@ -372,7 +372,7 @@ bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
 	Price::this_type price { msg->get<Price>()->get() };
 	auto er{make_message<ExecutionReport>()};
 	MessageBasePtr erb{detail::static_pointer_cast(er)};
-	msg->copy_legal(erb);
+	msg->copy_legal(erb); // copy all fields legal for ER from NOS
 
 	*er << er->make_field<OrderID>("ord" + to_string(++oid))
 		 << er->make_field<ExecID>("exec" + to_string(++eoid))
@@ -385,12 +385,11 @@ bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
 		 << er->make_field<LastCapacity>('4');
 	_session.send(move(er));
 
-	OrderQty::this_type remaining_qty{qty}, cum_qty{};
-	while (remaining_qty > 0)
+	for (OrderQty::this_type remaining_qty{qty}, cum_qty{}; remaining_qty > 0;)
 	{
 		auto trdqty{uniform_int_distribution<int>(1, remaining_qty)(Application::eng)};
 		er = make_message<ExecutionReport>();
-		MessageBasePtr erb{detail::static_pointer_cast(er)};
+		erb = detail::static_pointer_cast(er);
 		msg->copy_legal(erb);
 		cum_qty += trdqty;
 		*er << er->make_field<OrderID>("ord" + to_string(oid))
