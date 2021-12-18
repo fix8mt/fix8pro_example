@@ -542,6 +542,14 @@ terminated.
 </p>
 </details>
 
+<details><summary>Sample screenshot - server</summary>
+<p>
+
+![Shows the server responding to a logout out](assets/server_screenshot.png)
+
+</p>
+</details>
+
 <details><summary>Sample output - client</summary>
 <p>
 
@@ -1036,14 +1044,6 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 <p>
 
 ![Shows the client logging out](assets/client_screenshot.png)
-
-</p>
-</details>
-
-<details><summary>Sample screenshot - server</summary>
-<p>
-
-![Shows the server responding to a logout out](assets/server_screenshot.png)
 
 </p>
 </details>
