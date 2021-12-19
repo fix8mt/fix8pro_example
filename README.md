@@ -52,6 +52,7 @@ In our other terminal we'll run our client:
 - When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
+## Sample output
 <details><summary>Sample output - server</summary>
 <p>
 
