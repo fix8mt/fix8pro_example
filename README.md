@@ -5,6 +5,19 @@
 # Fix8Pro C++ example
 An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
+-   [To download](#to-download)
+-   [Before you build](#before-you-build)
+-   [To build](#to-build)
+-   [To setup your run environment](#to-setup-your-run-environment)
+-   [To run](#to-run)
+-   [Sample output](#sample-output)
+    1.   [Output server](#output-server)
+    1.   [Screenshot server](#screenshot-server)
+    1.  [Output client](#output-client)
+    1.   [Screenshot client](#screenshot-client)
+
+------------------------------------------------------------------------
+
 ## To download
 ```bash
 git clone https://github.com/fix8mt/fix8pro_example.git
@@ -53,7 +66,10 @@ In our other terminal we'll run our client:
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
 ## Sample output
-<details><summary>Sample output - server</summary>
+
+### Output server
+
+<details><summary><i>expand</i></summary>
 <p>
 
 ```bash
@@ -543,7 +559,9 @@ terminated.
 </p>
 </details>
 
-<details><summary>Sample screenshot - server</summary>
+### Screenshot server
+
+<details><summary><i>expand</i></summary>
 <i>Shows the server responding to a logout, send a logoff response, and then awaiting a new connection. Notice the state changes.</i>
 <p>
 
@@ -552,7 +570,9 @@ terminated.
 </p>
 </details>
 
-<details><summary>Sample output - client</summary>
+### Output client
+
+<details><summary><i>expand</i></summary>
 <p>
 
 ```bash
@@ -1042,7 +1062,9 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 </p>
 </details>
 
-<details><summary>Sample screenshot - client</summary>
+### Screenshot client
+
+<details><summary><i>expand</i></summary>
 <i>Shows the client sending a logout, and the response from the server. Notice the state changes.</i>
 <p>
 
