@@ -5,17 +5,17 @@
 # Fix8Pro C++ example
 An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
--   [To download](#to-download)
--   [Before you build](#before-you-build)
--   [To build](#to-build)
--   [To setup your run environment](#to-setup-your-run-environment)
--   [To run](#to-run)
--   [CLI options](#cli-options)
--   [Sample output](#sample-output)
-    1.   [Output server](#output-server)
-    1.   [Screenshot server](#screenshot-server)
-    1.   [Output client](#output-client)
-    1.   [Screenshot client](#screenshot-client)
+1.   [To download](#to-download)
+1.   [Before you build](#before-you-build)
+1.   [To build](#to-build)
+1.   [To setup your run environment](#to-setup-your-run-environment)
+1.   [To run](#to-run)
+1.   [CLI options](#cli-options)
+1.   [Sample output](#sample-output)
+      1.   [Output server](#output-server)
+      1.   [Screenshot server](#screenshot-server)
+      1.   [Output client](#output-client)
+      1.   [Screenshot client](#screenshot-client)
 
 ------------------------------------------------------------------------
 
