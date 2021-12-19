@@ -10,10 +10,11 @@ An example client/server that can be used as a starting point for development us
 -   [To build](#to-build)
 -   [To setup your run environment](#to-setup-your-run-environment)
 -   [To run](#to-run)
+-   [CLI options](#cli-options)
 -   [Sample output](#sample-output)
     1.   [Output server](#output-server)
     1.   [Screenshot server](#screenshot-server)
-    1.  [Output client](#output-client)
+    1.   [Output client](#output-client)
     1.   [Screenshot client](#screenshot-client)
 
 ------------------------------------------------------------------------
@@ -64,6 +65,58 @@ In our other terminal we'll run our client:
 ```
 - When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
+
+## CLI options
+```bash
+% ./simpleclisrv -h
+Fix8Pro sample client/server
+Usage:
+  simpleclisrv [OPTION...]
+
+  -c, --config arg         xml config (default: simple_client.xml or
+                           simple_server.xml)
+  -l, --log arg            global log filename (default: global.log)
+  -V, --serversession arg  name of server session profile to use (default:
+                           SRV)
+  -C, --clientsession arg  name of client session profile to use (default:
+                           CLI)
+  -q, --quiet              do not print fix output
+  -R, --receive arg        set next expected receive sequence number
+                           (default: 0)
+  -S, --send arg           set next expected send sequence number (default:
+                           0)
+  -g, --giveupreset arg    number of reliable reconnects to try before
+                           resetting seqnums (default: 10)
+  -r, --reliable           start in reliable mode (default: true)
+  -H, --showheartbeats     show inbound heartbeats (default: true)
+  -L, --libpath arg        library path to load Fix8 schema object, default
+                           path or LD_LIBRARY_PATH
+  -s, --server             run in server mode (default client mode)
+  -D, --debug              debug mode
+
+ info options:
+  -h, --help          Help screen
+  -v, --version       Version
+  -0, --showcmdline   Show cmdline details
+  -5, --environment   Show FIX8PRO environment variable help; show env vars
+                      (debug mode)
+  -6, --dependencies  Show shared library dependencies
+  -7, --binaryreport  Show ABI, lib and binary info
+  -8, --appinfo       Show application banner and info
+
+ history options:
+  -1, --history      Print command history; look in current directory or in
+                     $FIX8PRO_CMD_HIST_DIR; use $FIX8PRO_CMD_HIST_SIZE to set
+                     max history or 0 to turn off
+  -2, --invoke arg   Invoke given command by index (use -ve from last)
+  -3, --remove       Remove all history
+  -4, --interactive  Interactve mode, select/edit using bash-like commands,
+                     (? <enter> for help)
+
+e.g.
+  simpleclisrv -c config/simple_server.xml -s
+  simpleclisrv -c config/simple_client.xml
+```
 
 ## Sample output
 
