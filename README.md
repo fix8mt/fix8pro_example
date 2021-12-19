@@ -543,6 +543,7 @@ terminated.
 </details>
 
 <details><summary>Sample screenshot - server</summary>
+<i>Shows the server responding to a logout, send a logoff response, and then awaiting a new connection. Notice the state changes.</i>
 <p>
 
 ![Shows the server responding to a logout out](assets/server_screenshot.png)
@@ -1041,6 +1042,7 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 </details>
 
 <details><summary>Sample screenshot - client</summary>
+<i>Shows the client sending a logout, and the response from the server. Notice the state changes.</i>
 <p>
 
 ![Shows the client logging out](assets/client_screenshot.png)
