@@ -3,7 +3,7 @@
 </p>
 
 # Fix8Pro C++ example
-An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
+#### An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
 1.   [To download](#to-download)
 1.   [Before you build](#before-you-build)
@@ -67,6 +67,10 @@ In our other terminal we'll run our client:
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
 ## CLI options
+
+<details><summary><i>expand</i></summary>
+<p>
+
 ```bash
 % ./simpleclisrv -h
 Fix8Pro sample client/server
@@ -118,6 +122,9 @@ e.g.
   simpleclisrv -c config/simple_client.xml
 ```
 
+</p>
+</details>
+  
 ## Sample output
 
 ### Output server
@@ -1125,4 +1132,3 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 
 </p>
 </details>
-
