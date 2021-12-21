@@ -5,19 +5,26 @@
 # Fix8Pro C++ example
 #### An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
-1.   [To download](#to-download)
-1.   [Before you build](#before-you-build)
-1.   [To build](#to-build)
-1.   [To setup your run environment](#to-setup-your-run-environment)
-1.   [To run](#to-run)
-1.   [CLI options](#cli-options)
-1.   [Sample output](#sample-output)
+1.   [Introduction](#introduction)
+2.   [To download](#to-download)
+3.   [Before you build](#before-you-build)
+4.   [To build](#to-build)
+5.   [To setup your run environment](#to-setup-your-run-environment)
+6.   [To run](#to-run)
+7.   [CLI options](#cli-options)
+8.   [Sample output](#sample-output)
       1.   [Output server](#output-server)
       1.   [Screenshot server](#screenshot-server)
       1.   [Output client](#output-client)
       1.   [Screenshot client](#screenshot-client)
 
 ------------------------------------------------------------------------
+## Introduction
+You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example). For high performance and rapid development using a range of moder languages, choose UFE.
+
+The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++) on our [github repo](https://github.com/fix8mt/ufeed_bindings).
+
+This brief example demonstrates how to create a client and a server that can listen and initiate FIX sessions.
 
 ## To download
 ```bash
