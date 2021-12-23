@@ -3,7 +3,28 @@
 </p>
 
 # Fix8Pro C++ example
-An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
+#### An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
+
+1.   [Introduction](#introduction)
+2.   [To download](#to-download)
+3.   [Before you build](#before-you-build)
+4.   [To build](#to-build)
+5.   [To setup your run environment](#to-setup-your-run-environment)
+6.   [To run](#to-run)
+7.   [CLI options](#cli-options)
+8.   [Sample output](#sample-output)
+      1.   [Output server](#output-server)
+      1.   [Screenshot server](#screenshot-server)
+      1.   [Output client](#output-client)
+      1.   [Screenshot client](#screenshot-client)
+
+------------------------------------------------------------------------
+## Introduction
+You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example). For high performance and rapid development using a range of moder languages, choose UFE.
+
+The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++) on our [github repo](https://github.com/fix8mt/ufeed_bindings).
+
+This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions. This example uses the standard FIX42 dictionary.
 
 ## To download
 ```bash
@@ -52,8 +73,70 @@ In our other terminal we'll run our client:
 - When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
+## CLI options
+
+<details><summary><i>expand</i></summary>
+<p>
+
+```bash
+% ./simpleclisrv -h
+Fix8Pro sample client/server
+Usage:
+  simpleclisrv [OPTION...]
+
+  -c, --config arg         xml config (default: simple_client.xml or
+                           simple_server.xml)
+  -l, --log arg            global log filename (default: global.log)
+  -V, --serversession arg  name of server session profile to use (default:
+                           SRV)
+  -C, --clientsession arg  name of client session profile to use (default:
+                           CLI)
+  -q, --quiet              do not print fix output
+  -R, --receive arg        set next expected receive sequence number
+                           (default: 0)
+  -S, --send arg           set next expected send sequence number (default:
+                           0)
+  -g, --giveupreset arg    number of reliable reconnects to try before
+                           resetting seqnums (default: 10)
+  -r, --reliable           start in reliable mode (default: true)
+  -H, --showheartbeats     show inbound heartbeats (default: true)
+  -L, --libpath arg        library path to load Fix8 schema object, default
+                           path or LD_LIBRARY_PATH
+  -s, --server             run in server mode (default client mode)
+  -D, --debug              debug mode
+
+ info options:
+  -h, --help          Help screen
+  -v, --version       Version
+  -0, --showcmdline   Show cmdline details
+  -5, --environment   Show FIX8PRO environment variable help; show env vars
+                      (debug mode)
+  -6, --dependencies  Show shared library dependencies
+  -7, --binaryreport  Show ABI, lib and binary info
+  -8, --appinfo       Show application banner and info
+
+ history options:
+  -1, --history      Print command history; look in current directory or in
+                     $FIX8PRO_CMD_HIST_DIR; use $FIX8PRO_CMD_HIST_SIZE to set
+                     max history or 0 to turn off
+  -2, --invoke arg   Invoke given command by index (use -ve from last)
+  -3, --remove       Remove all history
+  -4, --interactive  Interactve mode, select/edit using bash-like commands,
+                     (? <enter> for help)
+
+e.g.
+  simpleclisrv -c config/simple_server.xml -s
+  simpleclisrv -c config/simple_client.xml
+```
+
+</p>
+</details>
+  
 ## Sample output
-<details><summary>Sample output - server</summary>
+
+### Output server
+
+<details><summary><i>expand</i></summary>
 <p>
 
 ```bash
@@ -543,7 +626,9 @@ terminated.
 </p>
 </details>
 
-<details><summary>Sample screenshot - server</summary>
+### Screenshot server
+
+<details><summary><i>expand</i></summary>
 <i>Shows the server responding to a logout, send a logoff response, and then awaiting a new connection. Notice the state changes.</i>
 <p>
 
@@ -552,7 +637,9 @@ terminated.
 </p>
 </details>
 
-<details><summary>Sample output - client</summary>
+### Output client
+
+<details><summary><i>expand</i></summary>
 <p>
 
 ```bash
@@ -1042,7 +1129,9 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 </p>
 </details>
 
-<details><summary>Sample screenshot - client</summary>
+### Screenshot client
+
+<details><summary><i>expand</i></summary>
 <i>Shows the client sending a logout, and the response from the server. Notice the state changes.</i>
 <p>
 
@@ -1050,4 +1139,3 @@ logoff_received => session_terminated (../runtime/session.cpp:358)
 
 </p>
 </details>
-
