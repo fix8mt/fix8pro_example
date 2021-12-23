@@ -125,6 +125,8 @@ class Application final : public Fix8ProApplication
 
 	int main(const vector<f8String>& args) override;
 	bool options_setup(cxxopts::Options& ops) override;
+	void server_session(ServerSessionBase *srv, int scnt);
+	void client_session(ClientSessionBase *mc);
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
@@ -198,16 +200,7 @@ int Application::main(const vector<f8String>& args)
 			{
 				if (!ms->poll()) // default timeout 250ms
 					continue;
-				unique_ptr<SessionInstanceBase> inst(ms->create_server_instance()); // we have a new session
-				auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) }; // use cast if you need to access specialisations in your session
-				if (!quiet)
-					ses->control() |= (hb ? Session::print : Session::printnohb);
-				cout << "Client session(" << ++scnt << ") connection established." << endl;
-				inst->start(false, next_send, next_receive); // when false, session starts and control returns immediately
-				while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
-					&& ses->get_connection()->is_connected() && !term_received)
-						hypersleep(1s);
-				ses->request_stop();
+				server_session(ms.get(), ++scnt);
 				cout << "Client session(" << scnt << ") finished. Waiting for new connection..." << endl;
 			}
 		}
@@ -215,49 +208,7 @@ int Application::main(const vector<f8String>& args)
 		{
 			unique_ptr<ClientSessionBase> mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
 																	: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
-			auto *ses { mc->session_ptr() };
-			if (!quiet)
-				ses->control() |= (hb ? Session::print : Session::printnohb);
-
-			const LoginParameters& lparam(ses->get_login_parameters());
-			if (reliable)
-				cout << "starting reliable client" << endl; // reliable is default
-			mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
-			cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
-			char ch;
-			while (!term_received)
-			{
-				timeval tv{5};
-				fd_set rfds;
-				FD_ZERO(&rfds);
-				FD_SET(0, &rfds);
-				if (select(1, &rfds, 0, 0, &tv) > 0 && read(0, &ch, 1) > 0)
-				{
-					if (ch == 'l')
-					{
-						ses->logout_and_shutdown("goodbye");
-						break;
-					}
-					else if (ch == 'q')
-						break;
-					else if (ch == 'x')
-						exit(1);
-				}
-				static unsigned oid{};
-				auto nos(make_message<NewOrderSingle>());
-				*nos << nos->make_field<TransactTime>()
-					  << nos->make_field<ClOrdID>("ord" + to_string(++oid))
-					  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
-					  << nos->make_field<OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
-					  << nos->make_field<Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
-					  << nos->make_field<Symbol>("NYSE::IBM")
-					  << nos->make_field<OrdType>(OrdType_Limit)
-					  << nos->make_field<Side>(uniform_int_distribution<int>(0, 1)(eng) ? Side_Buy : Side_Sell)
-					  << nos->make_field<TimeInForce>(TimeInForce_FillOrKill);
-				ses->send(move(nos));
-			}
-
-			ses->request_stop();
+			client_session(mc.get());
 		}
 	}
 	catch (const f8Exception& e)
@@ -279,6 +230,67 @@ int Application::main(const vector<f8String>& args)
 	if (term_received)
 		cout << "terminated." << endl;
 	return 0;
+}
+
+//-----------------------------------------------------------------------------------------
+void Application::server_session(ServerSessionBase *srv, int scnt)
+{
+	unique_ptr<SessionInstanceBase> inst(srv->create_server_instance()); // we have a new session
+	auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) }; // use cast if you need to access specialisations in your session
+	if (!quiet)
+		ses->control() |= (hb ? Session::print : Session::printnohb);
+	cout << "Client session(" << scnt << ") connection established." << endl;
+	inst->start(false, next_send, next_receive); // when false, session starts and control returns immediately
+	while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
+		&& ses->get_connection()->is_connected() && !term_received)
+			hypersleep(100ms);
+	ses->request_stop();
+}
+
+//-----------------------------------------------------------------------------------------
+void Application::client_session(ClientSessionBase *mc)
+{
+	auto *ses { mc->session_ptr() };
+	if (!quiet)
+		ses->control() |= (hb ? Session::print : Session::printnohb);
+	const LoginParameters& lparam(ses->get_login_parameters());
+	if (reliable)
+		cout << "starting reliable client" << endl; // reliable is default
+	mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
+	cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
+	char ch;
+	while (!term_received)
+	{
+		timeval tv{5};
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(0, &rfds);
+		if (select(1, &rfds, 0, 0, &tv) > 0 && read(0, &ch, 1) > 0)
+		{
+			if (ch == 'l')
+			{
+				ses->logout_and_shutdown("goodbye");
+				break;
+			}
+			else if (ch == 'q')
+				break;
+			else if (ch == 'x')
+				exit(1);
+		}
+		static unsigned oid{};
+		auto nos(make_message<NewOrderSingle>());
+		*nos << nos->make_field<TransactTime>()
+			  << nos->make_field<ClOrdID>("ord" + to_string(++oid))
+			  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
+			  << nos->make_field<OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
+			  << nos->make_field<Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
+			  << nos->make_field<Symbol>("NYSE::IBM")
+			  << nos->make_field<OrdType>(OrdType_Limit)
+			  << nos->make_field<Side>(uniform_int_distribution<int>(0, 1)(eng) ? Side_Buy : Side_Sell)
+			  << nos->make_field<TimeInForce>(TimeInForce_FillOrKill);
+		ses->send(move(nos));
+	}
+	ses->request_stop();
 }
 
 //-----------------------------------------------------------------------------------------
