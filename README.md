@@ -76,6 +76,7 @@ In our other terminal we'll run our client:
 ## CLI options
 
 <details><summary><i>expand</i></summary>
+  <i>These options are defined in </i><tt>Application::options_setup()</tt>. <i>Some of the options are added by </i><tt>Fix8ProApplication</tt>.
 <p>
 
 ```bash
