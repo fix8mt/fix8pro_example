@@ -125,8 +125,8 @@ class Application final : public Fix8ProApplication
 
 	int main(const vector<f8String>& args) override;
 	bool options_setup(cxxopts::Options& ops) override;
-	void server_session(ServerSessionBase *srv, int scnt);
-	void client_session(ClientSessionBase *mc);
+	void server_session(SessionInstanceBase_ptr inst, int scnt);
+	void client_session(ClientSessionBase_ptr mc);
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
@@ -189,26 +189,30 @@ int Application::main(const vector<f8String>& args)
 		cout << "loaded: " << (libpath = libp) << endl;
 
 		Fix8Pro::base_application_thread_name("clisrv");
-		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_" + global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
+		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_"
+			+ global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
 		Fix8ProInstance fix8pro_instance(1, glogname.c_str()); // warms up timer, setup logmanager, global logger
 
 		if (server)
 		{
-			unique_ptr<ServerSessionBase> ms(make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses));
+			ServerSessionBase_ptr ms(make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses));
+			cout << "Waiting for new connection..." << endl;
 
 			for (unsigned scnt{}; !term_received; )
 			{
 				if (!ms->poll()) // default timeout 250ms
 					continue;
-				server_session(ms.get(), ++scnt);
+				// we have a new session
+				SessionInstanceBase_ptr srv(ms->create_server_instance());
+				server_session(move(srv), ++scnt);
 				cout << "Client session(" << scnt << ") finished. Waiting for new connection..." << endl;
 			}
 		}
 		else
 		{
-			unique_ptr<ClientSessionBase> mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
-																	: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
-			client_session(mc.get());
+			ClientSessionBase_ptr mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
+														 : make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
+			client_session(move(mc));
 		}
 	}
 	catch (const f8Exception& e)
@@ -233,9 +237,8 @@ int Application::main(const vector<f8String>& args)
 }
 
 //-----------------------------------------------------------------------------------------
-void Application::server_session(ServerSessionBase *srv, int scnt)
+void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 {
-	unique_ptr<SessionInstanceBase> inst(srv->create_server_instance()); // we have a new session
 	auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) }; // use cast if you need to access specialisations in your session
 	if (!quiet)
 		ses->control() |= (hb ? Session::print : Session::printnohb);
@@ -248,7 +251,7 @@ void Application::server_session(ServerSessionBase *srv, int scnt)
 }
 
 //-----------------------------------------------------------------------------------------
-void Application::client_session(ClientSessionBase *mc)
+void Application::client_session(ClientSessionBase_ptr mc)
 {
 	auto *ses { mc->session_ptr() };
 	if (!quiet)
