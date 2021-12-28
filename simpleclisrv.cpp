@@ -147,7 +147,7 @@ bool Application::options_setup(Options& ops)
 {
 	ops.add_options()
 		("c,config", "xml config (default: simple_client.xml or simple_server.xml)", value<f8String>(clcf))
-		("l,log", "global log filename", value<f8String>(global_logger_name)->default_value("global.log"))
+		("l,log", "global log filename (default: ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)", value<f8String>(global_logger_name))
 		("V,serversession", "name of server session profile to use", value<f8String>(sses)->default_value("SRV"))
 		("C,clientsession", "name of client session profile to use", value<f8String>(cses)->default_value("CLI"))
 		("q,quiet", "do not print fix output", value<bool>(quiet)->default_value("false"))
@@ -188,14 +188,19 @@ int Application::main(const vector<f8String>& args)
 		}
 		cout << "loaded: " << (libpath = libp) << endl;
 
+		const f8String gtype { server ? "server" : "client" };
+		f8String glogname { "./run/" + gtype };
+		if (global_logger_name.empty())
+			glogname += "_%{DATE}_global.log;latest_" + gtype + "_global.log";
+		else
+			glogname += global_logger_name + ";latest_" + gtype + '_' + global_logger_name; // automatic symlink to latest
+
 		Fix8Pro::base_application_thread_name("clisrv");
-		const f8String gtype { server ? "server" : "client" }, glogname { "./run/" + gtype + "_%{DATE}_"
-			+ global_logger_name + ";latest_" + gtype + '_' + global_logger_name };
-		Fix8ProInstance fix8pro_instance(1, glogname.c_str()); // warms up timer, setup logmanager, global logger
+		Fix8ProInstance fix8pro_instance { 1, glogname.c_str() }; // warms up timer, setup logmanager, global logger
 
 		if (server)
 		{
-			ServerSessionBase_ptr ms(make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses));
+			ServerSessionBase_ptr ms { make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses) };
 			cout << "Waiting for new connection..." << endl;
 
 			for (unsigned scnt{}; !term_received; )
@@ -203,15 +208,15 @@ int Application::main(const vector<f8String>& args)
 				if (!ms->poll()) // default timeout 250ms
 					continue;
 				// we have a new session
-				SessionInstanceBase_ptr srv(ms->create_server_instance());
+				SessionInstanceBase_ptr srv { ms->create_server_instance() };
 				server_session(move(srv), ++scnt);
 				cout << "Client session(" << scnt << ") finished. Waiting for new connection..." << endl;
 			}
 		}
 		else
 		{
-			ClientSessionBase_ptr mc(reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
-														 : make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses));
+			ClientSessionBase_ptr mc { reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
+															: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses) };
 			client_session(move(mc));
 		}
 	}
@@ -239,7 +244,7 @@ int Application::main(const vector<f8String>& args)
 //-----------------------------------------------------------------------------------------
 void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 {
-	auto *ses { static_cast<SimpleSession*>(inst->session_ptr()) }; // use cast if you need to access specialisations in your session
+	auto *ses { inst->session_t_ptr<SimpleSession>() }; // obtains a pointer to your session
 	if (!quiet)
 		ses->control() |= (hb ? Session::print : Session::printnohb);
 	cout << "Client session(" << scnt << ") connection established." << endl;
@@ -253,10 +258,10 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 //-----------------------------------------------------------------------------------------
 void Application::client_session(ClientSessionBase_ptr mc)
 {
-	auto *ses { mc->session_ptr() };
+	auto *ses { mc->session_t_ptr<SimpleSession>() }; // obtains a pointer to your session
 	if (!quiet)
 		ses->control() |= (hb ? Session::print : Session::printnohb);
-	const LoginParameters& lparam(ses->get_login_parameters());
+	const LoginParameters& lparam { ses->get_login_parameters() };
 	if (reliable)
 		cout << "starting reliable client" << endl; // reliable is default
 	mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
@@ -281,7 +286,7 @@ void Application::client_session(ClientSessionBase_ptr mc)
 				exit(1);
 		}
 		static unsigned oid{};
-		auto nos(make_message<NewOrderSingle>());
+		auto nos { make_message<NewOrderSingle>() };
 		*nos << nos->make_field<TransactTime>()
 			  << nos->make_field<ClOrdID>("ord" + to_string(++oid))
 			  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
@@ -385,8 +390,8 @@ bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
 	static unsigned oid{}, eoid{};
 	OrderQty::this_type qty { msg->get<OrderQty>()->get() };
 	Price::this_type price { msg->get<Price>()->get() };
-	auto er{make_message<ExecutionReport>()};
-	MessageBasePtr erb{detail::static_pointer_cast(er)};
+	auto er { make_message<ExecutionReport>() };
+	MessageBasePtr erb { detail::static_pointer_cast(er) };
 	msg->copy_legal(erb); // copy all fields legal for ER from NOS
 
 	*er << er->make_field<OrderID>("ord" + to_string(++oid))
@@ -402,7 +407,7 @@ bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
 
 	for (OrderQty::this_type remaining_qty{qty}, cum_qty{}; remaining_qty > 0;)
 	{
-		auto trdqty{uniform_int_distribution<int>(1, remaining_qty)(Application::eng)};
+		auto trdqty { uniform_int_distribution<int>(1, remaining_qty)(Application::eng) };
 		er = make_message<ExecutionReport>();
 		erb = detail::static_pointer_cast(er);
 		msg->copy_legal(erb);
