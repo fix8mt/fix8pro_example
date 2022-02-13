@@ -20,7 +20,7 @@
 
 ------------------------------------------------------------------------
 ## Introduction
-You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example). For high performance and rapid development using a range of moder languages, choose UFE.
+You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example). For high performance and rapid development using a range of modern languages, choose UFE.
 
 The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++) on our [github repo](https://github.com/fix8mt/ufeed_bindings).
 
