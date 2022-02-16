@@ -29,8 +29,9 @@ This brief example demonstrates how to create a client and a server that can lis
 This example uses the standard FIX42 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
 
 ## To download
+There are two branches: `master` (stable version) and `dev` (latest cutting edge). Optionally specify the `dev` branch when you clone:
 ```bash
-git clone https://github.com/fix8mt/fix8pro_example.git
+git clone https://github.com/fix8mt/fix8pro_example.git [-b dev]
 cd fix8pro_example
 ```
 
