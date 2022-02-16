@@ -58,6 +58,7 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 				tabsize="3"
 				ipersist="file1"
 				decoder="canonical"
+				poll_interval_us="25000"
 				persist="file0" />
 
 	<session name="CLI"

@@ -24,7 +24,9 @@ You have two main options when you develop a FIX application using Fix8Pro. For 
 
 The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++) on our [github repo](https://github.com/fix8mt/ufeed_bindings).
 
-This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions. This example uses the standard FIX42 dictionary.
+This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions.
+
+This example uses the standard FIX42 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
 
 ## To download
 ```bash
@@ -132,7 +134,7 @@ e.g.
 
 </p>
 </details>
-  
+
 ## Sample output
 
 ### Output server

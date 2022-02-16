@@ -10,7 +10,7 @@
 
                Fix8Pro FIX Engine and Framework
 
-Copyright (C) 2010-21 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
+Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
 All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
 
 This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 2.  You can
@@ -48,6 +48,7 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <iterator>
 #include <typeinfo>
 #include <random>
+#include <chrono>
 
 // f8 headers
 #include <fix8pro/f8includes.hpp>
@@ -62,366 +63,462 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <FIX42_EXAMPLE_classes.hpp>
 
 //-----------------------------------------------------------------------------------------
-using namespace std;
 using namespace cxxopts;
 using namespace FIX8;
 using namespace FIX42_EXAMPLE;
 
 //-----------------------------------------------------------------------------------------
-class SimpleSession;
-
-/// universal inbound message router for client and server
-class SimpleSessionRouter final : public FIX42_EXAMPLE_Router
-{
-	SimpleSession& _session;
-
-public:
-	/*! Ctor.
-	    \param session client session */
-	SimpleSessionRouter(SimpleSession& session) : _session(session) {}
-
-	/*! Execution report handler. For client
-	    \param msg Execution report message session */
-	bool operator()(const ExecutionReport *msg) const override;
-
-	/*! NewOrderSingle message handler. For server
-	    \param msg NewOrderSingle message */
-	bool operator()(const NewOrderSingle *msg) const override;
-};
-
-//-----------------------------------------------------------------------------------------
-/// universal session for client and server
-class SimpleSession final : public Session
-{
-	SimpleSessionRouter _router;
-
-public:
-	SimpleSession(const F8MetaCntx& ctx, const SessionID& sid, PersisterPtr persist=PersisterPtr(), // client
-		LoggerPtr logger=LoggerPtr(), LoggerPtr plogger=LoggerPtr(), SupplementalsPtr&& supplementals=SupplementalsPtr())
-		: Session(ctx, sid, persist, logger, plogger, move(supplementals)), _router(*this) {}
-
-	SimpleSession(const F8MetaCntx& ctx, int session_count, const f8String& sci, PersisterPtr persist=PersisterPtr(), // server
-		LoggerPtr logger=LoggerPtr(), LoggerPtr plogger=LoggerPtr(), SupplementalsPtr&& supplementals=SupplementalsPtr())
-		: Session(ctx, session_count, sci, persist, logger, plogger, move(supplementals)), _router(*this) {}
-
-	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
-	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
-	void print_message(const MessagePtr& msg, ostream& os, bool usecolour) const override;
-	void on_send_success(const MessagePtr& msg) const override;
-	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
-};
-
-//-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
-	f8String libdir;
-	int giveupreset;
-	bool server, reliable, hb;
-	f8String clcf, global_logger_name, sses, cses, libpath;
-	unsigned next_send, next_receive;
+	int _giveupreset, _interval;
+	bool _server, _reliable, _hb, _quiet, _show_states, _generate;
+	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath;
+	unsigned _next_send, _next_receive;
+	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
 
-	static mt19937_64 eng;
-	static bool quiet;
-
-	int main(const vector<f8String>& args) override;
+	int main(const std::vector<f8String>& args) override; // required
 	bool options_setup(cxxopts::Options& ops) override;
+
 	void server_session(SessionInstanceBase_ptr inst, int scnt);
 	void client_session(ClientSessionBase_ptr mc);
+	char get_key(timeval wait={});
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
 	~Application() = default;
 
 	friend class SimpleSession;
-	friend class SimpleSessionRouter;
+};
+
+//-----------------------------------------------------------------------------------------
+// We're using Fix8ProApplication so we need to declare the instance
+Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_string("v2.1"), "Fix8Pro sample client/server");
+
+//-----------------------------------------------------------------------------------------
+/// Universal session for client and server
+/// Note: inheriting from the compiler generated router requires passing the -U flag to f8pc (see CMakeLists.txt)
+class SimpleSession final : public Session, FIX42_EXAMPLE_Router
+{
+	Application& _app { Fix8ProApplicationInstance::get() };
+
+	// ExecutionReport handler (client)
+	bool operator()(const ExecutionReport *msg) override;
+	// NewOrderSingle handler (server)
+	bool operator()(const NewOrderSingle *msg) override;
+
+	// required
+	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
+
+	// optional overrides
+	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
+	void reliable_state_change(States::ReliableSessionStates before, States::ReliableSessionStates after, std::any closure, const char *where=nullptr) override;
+	void print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const override;
+	void on_send_success(const MessagePtr& msg) const override;
+	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
+
+public:
+	using Session::Session;
+	~SimpleSession() = default;
 };
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
-Fix8ProApplicationInstance(Application, "simpleclisrv", "(your copyright string)", "Fix8Pro sample client/server");
-bool Application::quiet;
-mt19937_64 Application::eng(time(0));
-
-//-----------------------------------------------------------------------------------------
 bool Application::options_setup(Options& ops)
 {
-	ops.add_options()
-		("c,config", "xml config (default: simple_client.xml or simple_server.xml)", value<f8String>(clcf))
-		("l,log", "global log filename (default: ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)", value<f8String>(global_logger_name))
-		("V,serversession", "name of server session profile to use", value<f8String>(sses)->default_value("SRV"))
-		("C,clientsession", "name of client session profile to use", value<f8String>(cses)->default_value("CLI"))
-		("q,quiet", "do not print fix output", value<bool>(quiet)->default_value("false"))
-		("R,receive", "set next expected receive sequence number", value<unsigned>(next_receive)->default_value("0"))
-		("S,send", "set next expected send sequence number", value<unsigned>(next_send)->default_value("0"))
-		("g,giveupreset", "number of reliable reconnects to try before resetting seqnums", value<int>(giveupreset)->default_value("10"))
-		("r,reliable", "start in reliable mode", value<bool>(reliable)->default_value("true")->implicit_value("false"))
-		("H,showheartbeats", "show inbound heartbeats", value<bool>(hb)->default_value("true")->implicit_value("false"))
-		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(libdir))
-		("s,server", "run in server mode (default client mode)", value<bool>(server)->default_value("false"));
+	ops.add_options() // see cxxopts (https://github.com/jarro2783/cxxopts) for info about how Options work
+		("c,config", "xml config (default: simple_client.xml or simple_server.xml)", value<f8String>(_clcf))
+		("l,log", "global log filename (default: ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)", value<f8String>(_global_logger_name))
+		("V,serversession", "name of server session profile in xml config to use", value<f8String>(_sses)->default_value("SRV"))
+		("C,clientsession", "name of client session profile in xml config to use", value<f8String>(_cses)->default_value("CLI"))
+		("q,quiet", "do not print fix output", value<bool>(_quiet)->default_value("false"))
+		("R,receive", "set next expected receive sequence number", value<unsigned>(_next_receive)->default_value("0"))
+		("S,send", "set next expected send sequence number", value<unsigned>(_next_send)->default_value("0"))
+		("g,giveupreset", "number of reliable reconnects to try before resetting seqnums", value<int>(_giveupreset)->default_value("10"))
+		("r,reliable", "start in reliable mode", value<bool>(_reliable)->default_value("true")->implicit_value("false"))
+		("G,generate", "generate NewOrderSingle messages (client)", value<bool>(_generate)->default_value("true")->implicit_value("false"))
+		("I,interval", "generate interval (client, msecs)", value<int>(_interval)->default_value("5000"))
+		("H,showheartbeats", "show inbound heartbeats", value<bool>(_hb)->default_value("true")->implicit_value("false"))
+		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(_libdir))
+		("t,states", "show session and reliable session thread state changes", value<bool>(_show_states)->default_value("true")->implicit_value("false"))
+		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"));
 	add_postamble(R"(e.g.
   simpleclisrv -c config/simple_server.xml -s
-  simpleclisrv -c config/simple_client.xml)");
+  simpleclisrv -c config/simple_client.xml
+  simpleclisrv -015678vhD)");
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
-int Application::main(const vector<f8String>& args)
+int Application::main(const std::vector<f8String>& args)
 {
 	try
 	{
-		if (clcf.empty())
-			clcf = server ? "simple_client.xml" : "simple_server.xml";
-		if (!exist(clcf))
+		const f8String srvtype = _server ? "server" : "client";
+		if (_clcf.empty())
 		{
-			cerr << "configuration file " << clcf << " does not exist" << endl;
-			return 1;
+			using namespace std::string_literals;
+			_clcf = "simple_"s + srvtype + ".xml";
 		}
-		unique_ptr<istream> istr { make_unique<ifstream>(clcf.c_str()) }; // our config file as a stream
+		if (!exist(_clcf))
+			throw InvalidConfiguration(_clcf + " not found");
+		std::unique_ptr<std::istream> istr = std::make_unique<std::ifstream>(_clcf.c_str()); // our config file as a stream
 
-		void *handle{};
+		void *handle = nullptr;
 		f8String errstr;
-		auto [ctxfunc, libp] { load_cast_ctx_from_so("FIX42", libdir, handle, errstr) }; // load our FIX schema .so
+		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX42", _libdir, handle, errstr); // load our FIX schema .so
 		if (!ctxfunc)
-		{
-			cerr << errstr << endl;
-			return 1;
-		}
-		cout << "loaded: " << (libpath = libp) << endl;
+			throw BadSharedLibrary(errstr);
+		std::cout << "loaded: " << _libpath << std::endl;
 
-		const f8String gtype { server ? "server" : "client" };
-		f8String glogname { "./run/" + gtype };
-		if (global_logger_name.empty())
-			glogname += "_%{DATE}_global.log;latest_" + gtype + "_global.log";
+		f8String glogname = "./run/" + srvtype;
+		if (_global_logger_name.empty())
+			glogname += "_%{DATE}_global.log;latest_" + srvtype + "_global.log"; // logger expands DATE
 		else
-			glogname += global_logger_name + ";latest_" + gtype + '_' + global_logger_name; // automatic symlink to latest
+			glogname += _global_logger_name + ";latest_" + srvtype + '_' + _global_logger_name; // logger adds automatic symlink to latest
 
-		Fix8Pro::base_application_thread_name("clisrv");
-		Fix8ProInstance fix8pro_instance { 1, glogname.c_str() }; // warms up timer, setup logmanager, global logger
+		Fix8Pro::base_application_thread_name("clisrv"); // easier to view threads in ps/top/htop etc
+		Fix8ProInstance fix8pro_instance (1, glogname.c_str()); // warms up timer, setup logmanager, global logger
 
-		if (server)
+		if (_server)
 		{
-			ServerSessionBase_ptr ms { make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, sses) };
-			cout << "Waiting for new connection..." << endl;
+			ServerSessionBase_ptr ms = std::make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, _sses);
+			std::cout << "Waiting for new connection (x=quit)..." << std::endl;
 
-			for (unsigned scnt{}; !term_received; )
+			for (unsigned scnt = 0; !term_received; )
 			{
-				if (!ms->poll()) // default timeout 250ms
-					continue;
-				// we have a new session
-				SessionInstanceBase_ptr srv { ms->create_server_instance() };
-				server_session(move(srv), ++scnt);
-				cout << "Client session(" << scnt << ") finished. Waiting for new connection..." << endl;
+				if (ms->poll()) // default timeout 250ms
+				{
+					// we have a new session
+					SessionInstanceBase_ptr srv (ms->create_server_instance());
+					server_session(std::move(srv), ++scnt);
+					std::cout << "Client session(" << scnt << ") finished. Waiting for new connection (x=quit)..." << std::endl;
+				}
+				else if (get_key() == 'x') // immediate
+					break;
 			}
 		}
 		else
 		{
-			ClientSessionBase_ptr mc { reliable ? make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, cses, giveupreset)
-															: make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, cses) };
-			client_session(move(mc));
+			ClientSessionBase_ptr cli = _reliable	? std::make_unique<ReliableClientSession<SimpleSession>>(ctxfunc(), *istr, _cses, _giveupreset)
+																: std::make_unique<ClientSession<SimpleSession>>(ctxfunc(), *istr, _cses);
+			client_session(std::move(cli));
 		}
 	}
 	catch (const f8Exception& e)
 	{
-		cerr << "f8Exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		std::cerr << "f8Exception: " << COLOUR(Bold, Red, e.what()) << std::endl;
 		return 1;
 	}
-	catch (const exception& e)
+	catch (const std::exception& e)
 	{
-		cerr << "std::exception: " << COLOUR(Bold, Red, e.what()) << endl;
+		std::cerr << "std::exception: " << COLOUR(Bold, Red, e.what()) << std::endl;
 		return 1;
 	}
 	catch (...)
 	{
-		cerr << "unknown exception" << endl;
+		std::cerr << "unknown exception" << std::endl;
 		return 1;
 	}
 
 	if (term_received)
-		cout << "terminated." << endl;
+		std::cout << "terminated." << std::endl;
 	return 0;
+}
+
+//-----------------------------------------------------------------------------------------
+char Application::get_key(timeval wait)
+{
+	char ch = '\0';
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	FD_SET(0, &rfds);
+	if (select(1, &rfds, 0, 0, &wait) > 0)
+	{
+		std::cin.get(ch);
+		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+	}
+	return ch;
 }
 
 //-----------------------------------------------------------------------------------------
 void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 {
-	auto *ses { inst->session_t_ptr<SimpleSession>() }; // obtains a pointer to your session
-	if (!quiet)
-		ses->control() |= (hb ? Session::print : Session::printnohb);
-	cout << "Client session(" << scnt << ") connection established." << endl;
-	inst->start(false, next_send, next_receive); // when false, session starts and control returns immediately
+	auto *ses = inst->session_t_ptr<SimpleSession>(); // obtains a pointer to your session
+	if (!_quiet)
+		ses->control() |= (_hb ? Session::print : Session::printnohb); // turn on the built-in FIX printer
+	std::cout << "Client session(" << scnt << ") connection established." << std::endl;
+	inst->start(false, _next_send, _next_receive); // when false, session starts and control returns immediately
 	while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 		&& ses->get_connection()->is_connected() && !term_received)
-			hypersleep(100ms);
+	{
+		switch (get_key({0, 100 * 1000})) // 100ms
+		{
+		case 'l':
+			ses->logout_and_shutdown("goodbye from server");
+			break;
+		case 'q':
+			ses->control() |= Session::shutdown;
+			break;
+		case 'x':
+			exit(1);
+		case 'Q':
+			ses->control() ^= (_hb ? Session::print : Session::printnohb);
+			std::cout << "quiet " << std::boolalpha << (_quiet ^= true) << std::endl;
+			break;
+		case '?':
+			std::cout << "l - logout\nq - disconnect (no logout)\nx - just exit\nQ - toggle quiet\n? - help" << std::endl;
+			break;
+		default:
+			break;
+		}
+	}
 	ses->request_stop();
 }
 
 //-----------------------------------------------------------------------------------------
 void Application::client_session(ClientSessionBase_ptr mc)
 {
-	auto *ses { mc->session_t_ptr<SimpleSession>() }; // obtains a pointer to your session
-	if (!quiet)
-		ses->control() |= (hb ? Session::print : Session::printnohb);
-	const LoginParameters& lparam { ses->get_login_parameters() };
-	if (reliable)
-		cout << "starting reliable client" << endl; // reliable is default
-	mc->start(false, next_send, next_receive, lparam._davi); // when false, session starts and control returns immediately
-	cout << "Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit" << endl;
-	char ch;
-	while (!term_received)
+	auto *ses = mc->session_t_ptr<SimpleSession>(); // obtains a pointer to your session
+	if (!_quiet)
+		ses->control() |= (_hb ? Session::print : Session::printnohb); // turn on the built-in FIX printer
+	if (ses->get_login_parameters()._reliable)
+		std::cout << "starting reliable client" << std::endl; // reliable is default
+	mc->start(false, _next_send, _next_receive, ses->get_login_parameters()._davi); // when false, session starts and control returns immediately
+	const timeval wait { _interval / 1000L, (_interval % 1000L) * 1000L };
+	for (bool ok = true; ok && !term_received && !mc->has_given_up(); )
 	{
-		timeval tv{5};
-		fd_set rfds;
-		FD_ZERO(&rfds);
-		FD_SET(0, &rfds);
-		if (select(1, &rfds, 0, 0, &tv) > 0 && read(0, &ch, 1) > 0)
+		switch (get_key({wait}))
 		{
-			if (ch == 'l')
+		case 'l':
+			ses->logout_and_shutdown("goodbye from client");
+			[[fallthrough]];
+		case 'q':
+			ok = false;
+			break;
+		case 'x':
+			exit(1);
+		case 'g':
+			std::cout << "generate " << std::boolalpha << (_generate ^= true) << std::endl;
+			break;
+		case 'Q':
+			ses->control() ^= (_hb ? Session::print : Session::printnohb);
+			std::cout << "quiet " << std::boolalpha << (_quiet ^= true) << std::endl;
+			break;
+		case '?':
+			std::cout << "l - logout and quit\nq - quit (no logout)\nx - just exit\ng - toggle generate\nQ - toggle quiet\n? - help" << std::endl;
+			break;
+		default:
+			break;
+		case 0:
+			if (_generate)
 			{
-				ses->logout_and_shutdown("goodbye");
-				break;
+				static unsigned oid = 0;
+				auto nos = make_message<NewOrderSingle>();
+				*nos << nos->make_field<TransactTime>() // defaults to now
+					  << nos->make_field<EffectiveTime>(Tickval(2022, 4, 23, 10, 21, 1, 865765000), TimeIndicator::_with_us) // default is _with_ms
+					  << nos->make_field<ClOrdID>("clord" + std::to_string(++oid))
+					  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
+					  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, 100)(_eng))
+					  << nos->make_field<Price>(std::cauchy_distribution(119., 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
+					  << nos->make_field<Symbol>("NYSE::IBM")
+					  << nos->make_field<OrdType>(OrdType_Limit)
+					  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side_Buy : Side_Sell)
+					  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce_realm_els - 1)(_eng) + '0');
+				ses->send(std::move(nos));
 			}
-			else if (ch == 'q')
-				break;
-			else if (ch == 'x')
-				exit(1);
+			break;
 		}
-		static unsigned oid{};
-		auto nos { make_message<NewOrderSingle>() };
-		*nos << nos->make_field<TransactTime>()
-			  << nos->make_field<ClOrdID>("ord" + to_string(++oid))
-			  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
-			  << nos->make_field<OrderQty>(uniform_int_distribution<int>(1, 50)(eng))
-			  << nos->make_field<Price>(uniform_real_distribution<double>(119.0, 123.)(eng), 3)	// 3 decimal places if necessary
-			  << nos->make_field<Symbol>("NYSE::IBM")
-			  << nos->make_field<OrdType>(OrdType_Limit)
-			  << nos->make_field<Side>(uniform_int_distribution<int>(0, 1)(eng) ? Side_Buy : Side_Sell)
-			  << nos->make_field<TimeInForce>(TimeInForce_FillOrKill);
-		ses->send(move(nos));
 	}
 	ses->request_stop();
 }
 
 //-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
-// this is way we typically handle application messages
+/// This is way we typically handle application messages
 bool SimpleSession::handle_application(unsigned seqnum, MessagePtr& msg)
 {
-	return enforce(seqnum, msg) || msg->process(_router); // process calls appropriate FIX message handler
+	return enforce(seqnum, msg) || msg->process(*this); // process calls appropriate FIX message handler
 }
 
 //-----------------------------------------------------------------------------------------
-// this allows us to specialise the logon
+/// This allows us to specialise the logon (not needed for this example)
 MessagePtr SimpleSession::generate_logon(unsigned heartbeat_interval, const f8String davi)
 {
-	auto msg { Session::generate_logon(heartbeat_interval, davi) };
+	auto msg = Session::generate_logon(heartbeat_interval, davi);
 	return msg;
 }
 
 //-----------------------------------------------------------------------------------------
-void SimpleSession::print_message(const MessagePtr& msg, ostream& os, bool usecolour) const
+void SimpleSession::print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const
 {
-	if (!Application::quiet)
-	{
-		static const f8String rule { '\r' + f8String(20, '-') + " received " + f8String(20, '-') };
-		cout << rule << '\n';
-		Session::print_message(msg, cout, Application::use_colour());
-	}
+	static const f8String rule = '\r' + f8String(20, '-') + " received " + f8String(20, '-');
+	std::cout << rule << '\n';
+	Session::print_message(msg, std::cout, Application::use_colour());
 }
 
 //-----------------------------------------------------------------------------------------
 void SimpleSession::on_send_success(const MessagePtr& msg) const
 {
-	if (!Application::quiet)
+	if ((_control.has(Session::printnohb) && msg->get_msgtype() == F8FIX(MsgType_HEARTBEAT))
+		|| !_control.has(Session::print));
+	else
 	{
-		if (_control & Session::printnohb && msg->get_msgtype() == F8FIX(MsgType_HEARTBEAT))
-			;
-		else
-		{
-			static const f8String rule { '\r' + f8String(22, '-') + " sent " + f8String(22, '-') };
-			cout << rule << '\n';
-			Session::print_message(msg, cout, Application::use_colour());
-		}
+		static const f8String rule = '\r' + f8String(22, '-') + " sent " + f8String(22, '-');
+		std::cout << rule << '\n';
+		Session::print_message(msg, std::cout, Application::use_colour());
 	}
 }
 
 //-----------------------------------------------------------------------------------------
+/// Called by framework when the Session state changes
 void SimpleSession::state_change(States::SessionStates before, States::SessionStates after, const char *where)
 {
-	static const array state_colours
+	Session::state_change(before, after, where); // In debug logs to session log
+
+	if (_app._show_states)
 	{
-		COLOUR(Bold, Red, get_session_state_string(States::st_none)),
-		COLOUR(Bold, Green, get_session_state_string(States::st_continuous)),
-		COLOUR(Bold, Red, get_session_state_string(States::st_session_terminated)),
-		COLOUR(Bold, Yellow, get_session_state_string(States::st_wait_for_logon)),
-		COLOUR(Bold, Cyan, get_session_state_string(States::st_not_logged_in)),
-		COLOUR(Bold, Yellow, get_session_state_string(States::st_logon_sent)),
-		COLOUR(Bold, Magenta, get_session_state_string(States::st_logon_received)),
-		COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_sent)),
-		COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_received)),
-		COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_sent_and_received)),
-		COLOUR(Bold, Yellow, get_session_state_string(States::st_test_request_sent)),
-		COLOUR(Bold, Yellow, get_session_state_string(States::st_sequence_reset_sent)),
-		COLOUR(Bold, Yellow, get_session_state_string(States::st_sequence_reset_received)),
-		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_sent)),
-		COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_received))
-	};
-	cout << state_colours[before] << " => " << state_colours[after];
-	if (where)
-		cout << " (" << where << ')';
-	cout << endl;
+		static const std::array state_colours
+		{
+			COLOUR(Bold, Red, get_session_state_string(States::st_none)),
+			COLOUR(Bold, Green, get_session_state_string(States::st_continuous)),
+			COLOUR(Bold, Red, get_session_state_string(States::st_session_terminated)),
+			COLOUR(Bold, Yellow, get_session_state_string(States::st_wait_for_logon)),
+			COLOUR(Bold, Cyan, get_session_state_string(States::st_not_logged_in)),
+			COLOUR(Bold, Yellow, get_session_state_string(States::st_logon_sent)),
+			COLOUR(Bold, Magenta, get_session_state_string(States::st_logon_received)),
+			COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_sent)),
+			COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_received)),
+			COLOUR(Bold, Magenta, get_session_state_string(States::st_logoff_sent_and_received)),
+			COLOUR(Bold, Yellow, get_session_state_string(States::st_test_request_sent)),
+			COLOUR(Bold, Yellow, get_session_state_string(States::st_sequence_reset_sent)),
+			COLOUR(Bold, Yellow, get_session_state_string(States::st_sequence_reset_received)),
+			COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_sent)),
+			COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_received))
+		};
+		if (_loginParameters._reliable) // set by framework if session was started as reliable
+			std::cout << "   ";
+		std::cout << state_colours[before] << " => " << state_colours[after];
+	//	if (where)
+	//		std::cout << " (" << where << ')';
+		std::cout << std::endl;
+	}
+
+	// some tweaks to solve typical ReliableClient / Server gripes
 	if (before == States::st_logon_sent && after == States::st_logoff_received) // force reliable client to try again even though normal exit was detected
 		set_exit_state(false);
-	else if (before == States::st_logoff_received && after == States::st_logoff_sent_and_received && _connection_role == ConnectionRole::cn_acceptor)
-		logout_and_shutdown("goodbye");
+	else if (before == States::st_logoff_received && after == States::st_logoff_sent_and_received)
+	{
+		if (_connection_role == ConnectionRole::cn_acceptor)
+			logout_and_shutdown("goodbye");
+		else
+			set_exit_state(true);
+	}
 }
 
 //-----------------------------------------------------------------------------------------
+// Called by framework when the ReliableSession state changes - the reliability thread
+// Ensures a reliable client stays connected
+void SimpleSession::reliable_state_change(States::ReliableSessionStates before, States::ReliableSessionStates after, std::any closure, const char *where)
+{
+	Session::reliable_state_change(before, after, closure, where); // In debug logs to session log
+
+	if (_app._show_states)
+	{
+		static const std::array state_colours
+		{
+			COLOUR(Reverse, Red, get_reliable_session_state_string(States::rst_none)),
+			COLOUR(Reverse, Yellow, get_reliable_session_state_string(States::rst_attempting)),
+			COLOUR(Reverse, Red, get_reliable_session_state_string(States::rst_giving_up)),
+			COLOUR(Reverse, Red, get_reliable_session_state_string(States::rst_resetting)),
+			COLOUR(Reverse, Cyan, get_reliable_session_state_string(States::rst_failover)),
+			COLOUR(Reverse, Green, get_reliable_session_state_string(States::rst_connected)),
+			COLOUR(Reverse, Cyan, get_reliable_session_state_string(States::rst_disconnected)),
+			COLOUR(Reverse, Magenta, get_reliable_session_state_string(States::rst_starting)),
+			COLOUR(Reverse, Magenta, get_reliable_session_state_string(States::rst_stopping))
+		};
+		std::cout << state_colours[before] << " => " << state_colours[after];
+		if (closure.has_value())
+			std::cout << " (" << std::any_cast<unsigned>(closure) << ") attempt(s)";
+	//	if (where)
+	//		std::cout << " (" << where << ')';
+		std::cout << std::endl;
+	}
+}
+
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const ExecutionReport *msg) const
+bool SimpleSession::operator()(const ExecutionReport *msg)
 {
 	// client processing for received ERs
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSessionRouter::operator()(const NewOrderSingle *msg) const
+bool SimpleSession::operator()(const NewOrderSingle *msg)
 {
 	// server processing for received NOSs
-	static unsigned oid{}, eoid{};
-	OrderQty::this_type qty { msg->get<OrderQty>()->get() };
-	Price::this_type price { msg->get<Price>()->get() };
-	auto er { make_message<ExecutionReport>() };
-	MessageBasePtr erb { detail::static_pointer_cast(er) };
+	static unsigned oid = 0, eoid = 0;
+	OrderQty::this_type qty = msg->get<OrderQty>()->get();
+	Price::this_type price = msg->get<Price>()->get();
+	auto er = make_message<ExecutionReport>();
+	MessageBasePtr erb = detail::static_pointer_cast(er);
 	msg->copy_legal(erb); // copy all fields legal for ER from NOS
+	const f8String oidstr = "ord" + std::to_string(++oid);
 
-	*er << er->make_field<OrderID>("ord" + to_string(++oid))
-		 << er->make_field<ExecID>("exec" + to_string(++eoid))
-		 << er->make_field<ExecType>(ExecType_New)
-		 << er->make_field<OrdStatus>(OrdStatus_New)
+	*er << er->make_field<OrderID>(oidstr)
 		 << er->make_field<ExecTransType>(ExecTransType_New)
-		 << er->make_field<LeavesQty>(qty)
+		 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
 		 << er->make_field<CumQty>(0.)
 		 << er->make_field<AvgPx>(0.)
-		 << er->make_field<LastCapacity>('4');
-	_session.send(move(er));
+		 << er->make_field<LastCapacity>(LastCapacity_Principal);
 
-	for (OrderQty::this_type remaining_qty{qty}, cum_qty{}; remaining_qty > 0;)
+	auto accepted = std::bernoulli_distribution(0.80)(_app._eng); // 80% accepted, 20% rejected
+	if (accepted)
+		*er << er->make_field<OrdStatus>(OrdStatus_New)
+			 << er->make_field<LeavesQty>(qty)
+			 << er->make_field<ExecType>(ExecType_New);
+	else
+		*er << er->make_field<OrdStatus>(OrdStatus_Rejected)
+			 << er->make_field<LeavesQty>(0)
+			 << er->make_field<OrdRejReason>(std::uniform_int_distribution<>(0, OrdRejReason_realm_els - 1)(_app._eng))
+			 << er->make_field<ExecType>(ExecType_Rejected);
+	send(move(er));
+	if (!accepted)
+		return true;
+
+	for (OrderQty::this_type remaining_qty = qty, cum_qty = 0; remaining_qty > 0;)
 	{
-		auto trdqty { uniform_int_distribution<int>(1, remaining_qty)(Application::eng) };
+		auto trdqty = std::uniform_int_distribution<>(1, remaining_qty)(_app._eng);
 		er = make_message<ExecutionReport>();
 		erb = detail::static_pointer_cast(er);
 		msg->copy_legal(erb);
 		cum_qty += trdqty;
-		*er << er->make_field<OrderID>("ord" + to_string(oid))
-			 << er->make_field<ExecID>("exec" + to_string(++eoid))
-			 << er->make_field<ExecType>(ExecType_New)
+		*er << er->make_field<OrderID>(oidstr)
+			 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
+			 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType_Fill : ExecType_PartialFill)
 			 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus_Filled : OrdStatus_PartiallyFilled)
 			 << er->make_field<LeavesQty>(remaining_qty - trdqty)
 			 << er->make_field<ExecTransType>(ExecTransType_New)
 			 << er->make_field<CumQty>(cum_qty)
 			 << er->make_field<LastShares>(trdqty)
-			 << er->make_field<AvgPx>(price);
-		_session.send(move(er));
+			 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
+
+		// add some repeating groups
+		const auto& nocb = er->find_group<ExecutionReport::NoContraBrokers>();
+		int ncnt = 0;
+		for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
+		{
+			constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
+			auto gr1 = nocb->create_group();
+			auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng);
+			*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)])
+					<< er->make_field<ContraTradeQty>(retrdqtycb)
+					<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng)));
+			trdqtycb -= retrdqtycb;
+			*nocb << std::move(gr1);
+		}
+		*er << er->make_field<NoContraBrokers>(ncnt);
+
+		send(std::move(er));
 		remaining_qty -= trdqty;
 	}
 	return true;
