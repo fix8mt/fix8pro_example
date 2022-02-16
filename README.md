@@ -27,8 +27,9 @@ The UFE package comes with freely available high performance UFEed© client adap
 This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions. This example uses the standard FIX42 dictionary.
 
 ## To download
+There are two branches: `master` (stable version) and `dev` (latest cutting edge). Optionally specify the `dev` branch when you clone:
 ```bash
-git clone https://github.com/fix8mt/fix8pro_example.git
+git clone https://github.com/fix8mt/fix8pro_example.git [-b dev]
 cd fix8pro_example
 ```
 
