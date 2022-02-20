@@ -13,9 +13,9 @@
 ## Copyright (C) 2010-21 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
 ## All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
 ##
-## This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 2.  You can
+## This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 3.  You can
 ## redistribute  it  and / or modify  it under the  terms of  the  GNU Lesser  General  Public
-## License as  published  by  the Free  Software Foundation,  either version 2 of the License,
+## License as  published  by  the Free  Software Foundation,  either version 3 of the License,
 ## or (at your option) any later version.
 ##
 ## This file is distributed in the hope that it will be useful, but  WITHOUT ANY WARRANTY  and
