@@ -182,7 +182,7 @@ int Application::main(const std::vector<f8String>& args)
 		if (_server)
 		{
 			ServerSessionBase_ptr ms = std::make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, _sses);
-			std::cout << "Waiting for new connection (x=quit)..." << std::endl;
+			std::cout << "Waiting for new connection (q=quit)..." << std::endl;
 
 			for (unsigned scnt = 0; !term_received; )
 			{
@@ -191,9 +191,9 @@ int Application::main(const std::vector<f8String>& args)
 					// we have a new session
 					SessionInstanceBase_ptr srv (ms->create_server_instance());
 					server_session(std::move(srv), ++scnt);
-					std::cout << "Client session(" << scnt << ") finished. Waiting for new connection (x=quit)..." << std::endl;
+					std::cout << "Client session(" << scnt << ") finished. Waiting for new connection (q=quit)..." << std::endl;
 				}
-				else if (get_key() == 'x') // immediate
+				else if (get_key() == 'q') // immediate
 					break;
 			}
 		}
@@ -351,8 +351,7 @@ MessagePtr SimpleSession::generate_logon(unsigned heartbeat_interval, const f8St
 //-----------------------------------------------------------------------------------------
 void SimpleSession::print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const
 {
-	static const f8String rule = '\r' + f8String(20, '-') + " received " + f8String(20, '-');
-	std::cout << rule << '\n';
+	std::cout << "\r-------------------- received --------------------\n";
 	Session::print_message(msg, std::cout, Application::use_colour());
 }
 
@@ -363,8 +362,7 @@ void SimpleSession::on_send_success(const MessagePtr& msg) const
 		|| !_control.has(Session::print));
 	else
 	{
-		static const f8String rule = '\r' + f8String(22, '-') + " sent " + f8String(22, '-');
-		std::cout << rule << '\n';
+		std::cout << "\r---------------------- sent ----------------------\n";
 		Session::print_message(msg, std::cout, Application::use_colour());
 	}
 }
