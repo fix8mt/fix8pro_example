@@ -11,7 +11,7 @@
                Fix8Pro FIX Engine and Framework
 
 Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
-All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
+ALL RIGHTS RESERVED  https://www.fix8mt.com  heretohelp@fix8mt.com  @fix8mt
 
 This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 3.  You can
 redistribute  it  and / or modify  it under the  terms of  the  GNU Lesser  General  Public
@@ -96,7 +96,7 @@ Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_strin
 
 //-----------------------------------------------------------------------------------------
 /// Universal session for client and server
-/// Note: inheriting from the compiler generated router requires passing the -U flag to f8pc (see CMakeLists.txt)
+/// Note: inheriting from the compiler generated router requires passing the -U flag to the fix8pro compiler f8pc (see CMakeLists.txt)
 class SimpleSession final : public Session, FIX42_EXAMPLE_Router
 {
 	Application& _app { Fix8ProApplicationInstance::get() };
@@ -317,13 +317,13 @@ void Application::client_session(ClientSessionBase_ptr mc)
 				*nos << nos->make_field<TransactTime>() // defaults to now
 					  << nos->make_field<EffectiveTime>(Tickval(2022, 4, 23, 10, 21, 1, 865765000), TimeIndicator::_with_us) // default is _with_ms
 					  << nos->make_field<ClOrdID>("clord" + std::to_string(++oid))
-					  << nos->make_field<HandlInst>(HandlInst_AutomatedExecutionNoIntervention)
-					  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, 100)(_eng))
+					  << nos->make_field<HandlInst>(HandlInst::AutomatedExecutionNoIntervention)
+					  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, 100)(_eng)) // random qty
 					  << nos->make_field<Price>(std::cauchy_distribution(119., 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
 					  << nos->make_field<Symbol>("NYSE::IBM")
-					  << nos->make_field<OrdType>(OrdType_Limit)
-					  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side_Buy : Side_Sell)
-					  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce_realm_els - 1)(_eng) + '0');
+					  << nos->make_field<OrdType>(OrdType::Limit)
+					  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side::Buy : Side::Sell) // coin toss side
+					  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce::count - 1)(_eng) + '0'); // random tif
 				ses->send(std::move(nos));
 			}
 			break;
@@ -358,7 +358,7 @@ void SimpleSession::print_message(const MessagePtr& msg, std::ostream& os, bool 
 //-----------------------------------------------------------------------------------------
 void SimpleSession::on_send_success(const MessagePtr& msg) const
 {
-	if ((_control.has(Session::printnohb) && msg->get_msgtype() == F8FIX(MsgType_HEARTBEAT))
+	if ((_control.has(Session::printnohb) && msg->get_msgtype() == MsgType::Heartbeat)
 		|| !_control.has(Session::print));
 	else
 	{
@@ -463,22 +463,22 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 	const f8String oidstr = "ord" + std::to_string(++oid);
 
 	*er << er->make_field<OrderID>(oidstr)
-		 << er->make_field<ExecTransType>(ExecTransType_New)
+		 << er->make_field<ExecTransType>(ExecTransType::New)
 		 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
 		 << er->make_field<CumQty>(0.)
 		 << er->make_field<AvgPx>(0.)
-		 << er->make_field<LastCapacity>(LastCapacity_Principal);
+		 << er->make_field<LastCapacity>(LastCapacity::Principal);
 
 	auto accepted = std::bernoulli_distribution(0.80)(_app._eng); // 80% accepted, 20% rejected
 	if (accepted)
-		*er << er->make_field<OrdStatus>(OrdStatus_New)
+		*er << er->make_field<OrdStatus>(OrdStatus::New)
 			 << er->make_field<LeavesQty>(qty)
-			 << er->make_field<ExecType>(ExecType_New);
+			 << er->make_field<ExecType>(ExecType::New);
 	else
-		*er << er->make_field<OrdStatus>(OrdStatus_Rejected)
+		*er << er->make_field<OrdStatus>(OrdStatus::Rejected)
 			 << er->make_field<LeavesQty>(0)
-			 << er->make_field<OrdRejReason>(std::uniform_int_distribution<>(0, OrdRejReason_realm_els - 1)(_app._eng))
-			 << er->make_field<ExecType>(ExecType_Rejected);
+			 << er->make_field<OrdRejReason>(std::uniform_int_distribution<>(0, OrdRejReason::count - 1)(_app._eng)) // random orr
+			 << er->make_field<ExecType>(ExecType::Rejected);
 	send(move(er));
 	if (!accepted)
 		return true;
@@ -492,10 +492,10 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 		cum_qty += trdqty;
 		*er << er->make_field<OrderID>(oidstr)
 			 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
-			 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType_Fill : ExecType_PartialFill)
-			 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus_Filled : OrdStatus_PartiallyFilled)
+			 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType::Fill : ExecType::PartialFill)
+			 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
 			 << er->make_field<LeavesQty>(remaining_qty - trdqty)
-			 << er->make_field<ExecTransType>(ExecTransType_New)
+			 << er->make_field<ExecTransType>(ExecTransType::New)
 			 << er->make_field<CumQty>(cum_qty)
 			 << er->make_field<LastShares>(trdqty)
 			 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
@@ -508,9 +508,9 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 			constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
 			auto gr1 = nocb->create_group();
 			auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng);
-			*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)])
+			*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb
 					<< er->make_field<ContraTradeQty>(retrdqtycb)
-					<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng)));
+					<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng))); // random ct
 			trdqtycb -= retrdqtycb;
 			*nocb << std::move(gr1);
 		}
