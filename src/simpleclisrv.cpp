@@ -72,7 +72,7 @@ class Application final : public Fix8ProApplication
 {
 	int _giveupreset, _interval;
 	bool _server, _reliable, _hb, _quiet, _show_states, _generate;
-	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath;
+	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname;
 	unsigned _next_send, _next_receive;
 	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
 
@@ -81,7 +81,6 @@ class Application final : public Fix8ProApplication
 
 	void server_session(SessionInstanceBase_ptr inst, int scnt);
 	void client_session(ClientSessionBase_ptr mc);
-	char get_key(timeval wait={});
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
@@ -122,6 +121,31 @@ public:
 };
 
 //-----------------------------------------------------------------------------------------
+namespace
+{
+	std::string make_id(int val)
+	{
+		std::ostringstream ostr;
+		ostr << std::setw(8) << std::setfill('0') << val;
+		return std::move(ostr.str());
+	}
+
+	char get_wait_key(timeval wait={})
+	{
+		char ch = '\0';
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(0, &rfds);
+		if (select(1, &rfds, 0, 0, &wait) > 0)
+		{
+			std::cin.get(ch);
+			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+		}
+		return ch;
+	}
+}
+
+//-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
 bool Application::options_setup(Options& ops)
 {
@@ -139,6 +163,7 @@ bool Application::options_setup(Options& ops)
 		("I,interval", "generate interval (client, msecs)", value<int>(_interval)->default_value("5000"))
 		("H,showheartbeats", "show inbound heartbeats", value<bool>(_hb)->default_value("true")->implicit_value("false"))
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(_libdir))
+		("T,threadname", "prefix thread names with given string", value<f8String>(_tname))
 		("t,states", "show session and reliable session thread state changes", value<bool>(_show_states)->default_value("true")->implicit_value("false"))
 		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"));
 	add_postamble(R"(e.g.
@@ -153,12 +178,10 @@ int Application::main(const std::vector<f8String>& args)
 {
 	try
 	{
+		using namespace std::string_literals;
 		const f8String srvtype = _server ? "server" : "client";
-		if (_clcf.empty())
-		{
-			using namespace std::string_literals;
+		if (!has("config"))
 			_clcf = "simple_"s + srvtype + ".xml";
-		}
 		if (!exist(_clcf))
 			throw InvalidConfiguration(_clcf + " not found");
 		std::unique_ptr<std::istream> istr = std::make_unique<std::ifstream>(_clcf.c_str()); // our config file as a stream
@@ -171,30 +194,30 @@ int Application::main(const std::vector<f8String>& args)
 		std::cout << "loaded: " << _libpath << std::endl;
 
 		f8String glogname = "./run/" + srvtype;
-		if (_global_logger_name.empty())
+		if (!has("log"))
 			glogname += "_%{DATE}_global.log;latest_" + srvtype + "_global.log"; // logger expands DATE
 		else
 			glogname += _global_logger_name + ";latest_" + srvtype + '_' + _global_logger_name; // logger adds automatic symlink to latest
 
-		Fix8Pro::base_application_thread_name("clisrv"); // easier to view threads in ps/top/htop etc
+		if (has("threadname"))
+			Fix8Pro::base_application_thread_name(_tname); // easier to view threads in ps/top/htop etc
 		Fix8ProInstance fix8pro_instance (1, glogname.c_str()); // warms up timer, setup logmanager, global logger
 
 		if (_server)
 		{
 			ServerSessionBase_ptr ms = std::make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, _sses);
-			std::cout << "Waiting for new connection (q=quit)..." << std::endl;
+			constexpr f8String_view prompt {"Waiting for new connection (q=quit)..."};
+			std::cout << prompt << std::endl;
 
-			for (unsigned scnt = 0; !term_received; )
+			for (unsigned scnt = 0; !term_received && get_wait_key() != 'q';)
 			{
 				if (ms->poll()) // default timeout 250ms
 				{
 					// we have a new session
 					SessionInstanceBase_ptr srv (ms->create_server_instance());
 					server_session(std::move(srv), ++scnt);
-					std::cout << "Client session(" << scnt << ") finished. Waiting for new connection (q=quit)..." << std::endl;
+					std::cout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
 				}
-				else if (get_key() == 'q') // immediate
-					break;
 			}
 		}
 		else
@@ -226,21 +249,6 @@ int Application::main(const std::vector<f8String>& args)
 }
 
 //-----------------------------------------------------------------------------------------
-char Application::get_key(timeval wait)
-{
-	char ch = '\0';
-	fd_set rfds;
-	FD_ZERO(&rfds);
-	FD_SET(0, &rfds);
-	if (select(1, &rfds, 0, 0, &wait) > 0)
-	{
-		std::cin.get(ch);
-		std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-	}
-	return ch;
-}
-
-//-----------------------------------------------------------------------------------------
 void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 {
 	auto *ses = inst->session_t_ptr<SimpleSession>(); // obtains a pointer to your session
@@ -251,7 +259,7 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 	while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 		&& ses->get_connection()->is_connected() && !term_received)
 	{
-		switch (get_key({0, 100 * 1000})) // 100ms
+		switch (get_wait_key({0, 100 * 1000})) // 100ms
 		{
 		case 'l':
 			ses->logout_and_shutdown("goodbye from server");
@@ -287,7 +295,7 @@ void Application::client_session(ClientSessionBase_ptr mc)
 	const timeval wait { _interval / 1000L, (_interval % 1000L) * 1000L };
 	for (bool ok = true; ok && !term_received && !mc->has_given_up(); )
 	{
-		switch (get_key({wait}))
+		switch (get_wait_key({wait}))
 		{
 		case 'l':
 			ses->logout_and_shutdown("goodbye from client");
@@ -316,10 +324,10 @@ void Application::client_session(ClientSessionBase_ptr mc)
 				auto nos = make_message<NewOrderSingle>();
 				*nos << nos->make_field<TransactTime>() // defaults to now
 					  << nos->make_field<EffectiveTime>(Tickval(2022, 4, 23, 10, 21, 1, 865765000), TimeIndicator::_with_us) // default is _with_ms
-					  << nos->make_field<ClOrdID>("clord" + std::to_string(++oid))
+					  << nos->make_field<ClOrdID>('C' + tp_to_string(Tickval(true).get_time_point(), R"(%Y%m%d)") + make_id(++oid))
 					  << nos->make_field<HandlInst>(HandlInst::AutomatedExecutionNoIntervention)
 					  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, 100)(_eng)) // random qty
-					  << nos->make_field<Price>(std::cauchy_distribution(119., 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
+					  << nos->make_field<Price>(std::cauchy_distribution(121.78, 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
 					  << nos->make_field<Symbol>("NYSE::IBM")
 					  << nos->make_field<OrdType>(OrdType::Limit)
 					  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side::Buy : Side::Sell) // coin toss side
@@ -460,65 +468,69 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 	auto er = make_message<ExecutionReport>();
 	MessageBasePtr erb = detail::static_pointer_cast(er);
 	msg->copy_legal(erb); // copy all fields legal for ER from NOS
-	const f8String oidstr = "ord" + std::to_string(++oid);
+	const auto tpstr = tp_to_string(Tickval(true).get_time_point(), R"(%Y%m%d)");
+	const auto oidstr = 'O' + tpstr + make_id(++oid);
 
 	*er << er->make_field<OrderID>(oidstr)
 		 << er->make_field<ExecTransType>(ExecTransType::New)
-		 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
+		 << er->make_field<ExecID>('E' + tpstr + make_id(++eoid))
 		 << er->make_field<CumQty>(0.)
 		 << er->make_field<AvgPx>(0.)
 		 << er->make_field<LastCapacity>(LastCapacity::Principal);
 
-	auto accepted = std::bernoulli_distribution(0.80)(_app._eng); // 80% accepted, 20% rejected
-	if (accepted)
+	if (std::bernoulli_distribution(0.80)(_app._eng)) // 80% accepted, 20% rejected
+	{
 		*er << er->make_field<OrdStatus>(OrdStatus::New)
 			 << er->make_field<LeavesQty>(qty)
 			 << er->make_field<ExecType>(ExecType::New);
+		send(move(er));
+
+		for (OrderQty::this_type remaining_qty = qty, cum_qty = 0; remaining_qty > 0;)
+		{
+			auto trdqty = std::uniform_int_distribution<>(1, remaining_qty)(_app._eng);
+			er = make_message<ExecutionReport>();
+			erb = detail::static_pointer_cast(er);
+			msg->copy_legal(erb);
+			cum_qty += trdqty;
+			*er << er->make_field<OrderID>(oidstr)
+				 << er->make_field<ExecID>('F' + tpstr + make_id(++eoid))
+				 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType::Fill : ExecType::PartialFill)
+				 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
+				 << er->make_field<LeavesQty>(remaining_qty - trdqty)
+				 << er->make_field<ExecTransType>(ExecTransType::New)
+				 << er->make_field<CumQty>(cum_qty)
+				 << er->make_field<LastShares>(trdqty)
+				 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
+
+			// add some repeating groups
+			const auto& nocb = er->find_group<ExecutionReport::NoContraBrokers>();
+			int ncnt = 0;
+			for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
+			{
+				constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
+				auto gr1 = nocb->create_group();
+				auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng);
+				*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb
+						<< er->make_field<ContraTradeQty>(retrdqtycb)
+						<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng))); // random ct
+				trdqtycb -= retrdqtycb;
+				*nocb << std::move(gr1);
+			}
+			*er << er->make_field<NoContraBrokers>(ncnt);
+
+			send(std::move(er));
+			remaining_qty -= trdqty;
+		}
+	}
 	else
+	{
 		*er << er->make_field<OrdStatus>(OrdStatus::Rejected)
 			 << er->make_field<LeavesQty>(0)
 			 << er->make_field<OrdRejReason>(std::uniform_int_distribution<>(0, OrdRejReason::count - 1)(_app._eng)) // random orr
 			 << er->make_field<ExecType>(ExecType::Rejected);
-	send(move(er));
-	if (!accepted)
-		return true;
-
-	for (OrderQty::this_type remaining_qty = qty, cum_qty = 0; remaining_qty > 0;)
-	{
-		auto trdqty = std::uniform_int_distribution<>(1, remaining_qty)(_app._eng);
-		er = make_message<ExecutionReport>();
-		erb = detail::static_pointer_cast(er);
-		msg->copy_legal(erb);
-		cum_qty += trdqty;
-		*er << er->make_field<OrderID>(oidstr)
-			 << er->make_field<ExecID>("exec" + std::to_string(++eoid))
-			 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType::Fill : ExecType::PartialFill)
-			 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
-			 << er->make_field<LeavesQty>(remaining_qty - trdqty)
-			 << er->make_field<ExecTransType>(ExecTransType::New)
-			 << er->make_field<CumQty>(cum_qty)
-			 << er->make_field<LastShares>(trdqty)
-			 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
-
-		// add some repeating groups
-		const auto& nocb = er->find_group<ExecutionReport::NoContraBrokers>();
-		int ncnt = 0;
-		for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
-		{
-			constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
-			auto gr1 = nocb->create_group();
-			auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng);
-			*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb
-					<< er->make_field<ContraTradeQty>(retrdqtycb)
-					<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng))); // random ct
-			trdqtycb -= retrdqtycb;
-			*nocb << std::move(gr1);
-		}
-		*er << er->make_field<NoContraBrokers>(ncnt);
-
-		send(std::move(er));
-		remaining_qty -= trdqty;
+		send(move(er));
 	}
+
 	return true;
 }
 

@@ -1,0 +1,3 @@
+#!/bin/bash
+rm -vrf ./run/*
+rm -vrf ./latest_*log

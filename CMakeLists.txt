@@ -99,7 +99,7 @@ target_link_libraries(FIX42_EXAMPLE PRIVATE fix8pro fix8proutils)
 # add_gen_static_library(FIX50SP2 schema/FIX50SP2.xml  -L --verbose --namespace FIX50SP2 -p FIX50SP2 --fixt ${CMAKE_CURRENT_SOURCE_DIR}/schema/FIXT11.xml)
 # target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
 
-add_executable(simpleclisrv simpleclisrv.cpp)
+add_executable(simpleclisrv src/simpleclisrv.cpp)
 target_link_libraries(simpleclisrv PRIVATE FIX42_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
