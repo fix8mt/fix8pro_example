@@ -58,21 +58,21 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #define COLOUR(x,y,z) Colours::make_string16({Attribute::x, Colour::y},z,Application::use_colour())
 
 //-----------------------------------------------------------------------------------------
-#include <FIX42_EXAMPLE_types.hpp>
-#include <FIX42_EXAMPLE_router.hpp>
-#include <FIX42_EXAMPLE_classes.hpp>
+#include <FIX44_EXAMPLE_types.hpp>
+#include <FIX44_EXAMPLE_router.hpp>
+#include <FIX44_EXAMPLE_classes.hpp>
 
 //-----------------------------------------------------------------------------------------
 using namespace cxxopts;
 using namespace FIX8;
-using namespace FIX42_EXAMPLE;
+using namespace FIX44_EXAMPLE;
 
 //-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
 	int _giveupreset, _interval;
 	bool _server, _reliable, _hb, _quiet, _show_states, _generate;
-	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname;
+	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password;
 	unsigned _next_send, _next_receive;
 	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
 
@@ -96,7 +96,7 @@ Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_strin
 //-----------------------------------------------------------------------------------------
 /// Universal session for client and server
 /// Note: inheriting from the compiler generated router requires passing the -U flag to the fix8pro compiler f8pc (see CMakeLists.txt)
-class SimpleSession final : public Session, FIX42_EXAMPLE_Router
+class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 {
 	Application& _app { Fix8ProApplicationInstance::get() };
 
@@ -109,11 +109,12 @@ class SimpleSession final : public Session, FIX42_EXAMPLE_Router
 	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
 
 	// optional overrides
+	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
+	bool authenticate(SessionID& id, const MessagePtr& msg) override;
 	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
 	void reliable_state_change(States::ReliableSessionStates before, States::ReliableSessionStates after, std::any closure, const char *where=nullptr) override;
 	void print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const override;
 	void on_send_success(const MessagePtr& msg) const override;
-	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
 
 public:
 	using Session::Session;
@@ -165,6 +166,8 @@ bool Application::options_setup(Options& ops)
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(_libdir))
 		("T,threadname", "prefix thread names with given string", value<f8String>(_tname))
 		("t,states", "show session and reliable session thread state changes", value<bool>(_show_states)->default_value("true")->implicit_value("false"))
+		("U,username", "FIX username used in logon", value<f8String>(_username)->default_value("testuser"))
+		("P,password", "FIX password used in logon (cleartext)", value<f8String>(_password)->default_value("password"))
 		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"));
 	add_postamble(R"(e.g.
   simpleclisrv -c config/simple_server.xml -s
@@ -188,7 +191,7 @@ int Application::main(const std::vector<f8String>& args)
 
 		void *handle = nullptr;
 		f8String errstr;
-		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX42", _libdir, handle, errstr); // load our FIX schema .so
+		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX44", _libdir, handle, errstr); // load our FIX schema .so
 		if (!ctxfunc)
 			throw BadSharedLibrary(errstr);
 		std::cout << "loaded: " << _libpath << std::endl;
@@ -213,10 +216,15 @@ int Application::main(const std::vector<f8String>& args)
 			{
 				if (ms->poll()) // default timeout 250ms
 				{
-					// we have a new session
-					SessionInstanceBase_ptr srv (ms->create_server_instance());
-					server_session(std::move(srv), ++scnt);
-					std::cout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
+					std::thread worker([&]() // run acceptor in new thread
+					{
+						// we have a new session
+						SessionInstanceBase_ptr srv (ms->create_server_instance());
+						server_session(std::move(srv), scnt++);
+						std::cout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
+					});
+					if (worker.joinable())
+						worker.join(); // for mulitple concurrent clients, we wouldn't block here
 				}
 			}
 		}
@@ -251,6 +259,7 @@ int Application::main(const std::vector<f8String>& args)
 //-----------------------------------------------------------------------------------------
 void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 {
+	set_application_thread_name("worker/" + std::to_string(scnt));
 	auto *ses = inst->session_t_ptr<SimpleSession>(); // obtains a pointer to your session
 	if (!_quiet)
 		ses->control() |= (_hb ? Session::print : Session::printnohb); // turn on the built-in FIX printer
@@ -349,11 +358,21 @@ bool SimpleSession::handle_application(unsigned seqnum, MessagePtr& msg)
 }
 
 //-----------------------------------------------------------------------------------------
-/// This allows us to specialise the logon (not needed for this example)
+/// This allows us to specialise the logon
 MessagePtr SimpleSession::generate_logon(unsigned heartbeat_interval, const f8String davi)
 {
 	auto msg = Session::generate_logon(heartbeat_interval, davi);
+	*msg	<< msg->make_field<Username>(_app._username)
+			<< msg->make_field<Password>(_app._password);
 	return msg;
+}
+
+//-----------------------------------------------------------------------------------------
+/// Intercept server authentication
+bool SimpleSession::authenticate(SessionID& id, const MessagePtr& msg)
+{
+	return msg->has<Username>() && msg->has<Password>()
+		&& msg->get<Username>()->get() == _app._username && msg->get<Password>()->get() == _app._password;
 }
 
 //-----------------------------------------------------------------------------------------
@@ -472,7 +491,6 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 	const auto oidstr = 'O' + tpstr + make_id(++oid);
 
 	*er << er->make_field<OrderID>(oidstr)
-		 << er->make_field<ExecTransType>(ExecTransType::New)
 		 << er->make_field<ExecID>('E' + tpstr + make_id(++eoid))
 		 << er->make_field<CumQty>(0.)
 		 << er->make_field<AvgPx>(0.)
@@ -494,12 +512,11 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 			cum_qty += trdqty;
 			*er << er->make_field<OrderID>(oidstr)
 				 << er->make_field<ExecID>('F' + tpstr + make_id(++eoid))
-				 << er->make_field<ExecType>(remaining_qty == trdqty ? ExecType::Fill : ExecType::PartialFill)
+				 << er->make_field<ExecType>(ExecType::Trade)
 				 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
 				 << er->make_field<LeavesQty>(remaining_qty - trdqty)
-				 << er->make_field<ExecTransType>(ExecTransType::New)
 				 << er->make_field<CumQty>(cum_qty)
-				 << er->make_field<LastShares>(trdqty)
+				 << er->make_field<LastQty>(trdqty)
 				 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
 
 			// add some repeating groups
