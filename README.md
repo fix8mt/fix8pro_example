@@ -26,7 +26,7 @@ The UFE package comes with freely available high performance UFEed© client adap
 
 This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions.
 
-This example uses the standard FIX42 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
+This example uses the standard FIX44 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
 
 ## To download
 There are two branches: `master` (stable version) and `dev` (latest cutting edge). Optionally specify the `dev` branch when you clone:

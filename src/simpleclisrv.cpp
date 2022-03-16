@@ -49,6 +49,7 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <typeinfo>
 #include <random>
 #include <chrono>
+#include <poll.h>
 
 // f8 headers
 #include <fix8pro/f8includes.hpp>
@@ -66,12 +67,13 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 using namespace cxxopts;
 using namespace FIX8;
 using namespace FIX44_EXAMPLE;
+using namespace std::string_literals;
 
 //-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
 	int _giveupreset, _interval;
-	bool _server, _reliable, _hb, _quiet, _show_states, _generate;
+	bool _server, _reliable, _hb, _quiet, _show_states, _generate, _summary;
 	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password;
 	unsigned _next_send, _next_receive;
 	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
@@ -81,6 +83,7 @@ class Application final : public Fix8ProApplication
 
 	void server_session(SessionInstanceBase_ptr inst, int scnt);
 	void client_session(ClientSessionBase_ptr mc);
+	MessagePtr generate_order();
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
@@ -91,14 +94,14 @@ public:
 
 //-----------------------------------------------------------------------------------------
 // We're using Fix8ProApplication so we need to declare the instance
-Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_string("v2.1"), "Fix8Pro sample client/server");
+Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_string("v2.3"), "Fix8Pro sample client/server");
 
 //-----------------------------------------------------------------------------------------
 /// Universal session for client and server
 /// Note: inheriting from the compiler generated router requires passing the -U flag to the fix8pro compiler f8pc (see CMakeLists.txt)
 class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 {
-	Application& _app { Fix8ProApplicationInstance::get() };
+	Application& _app { Application::get_instance<Application>() };
 
 	// ExecutionReport handler (client)
 	bool operator()(const ExecutionReport *msg) override;
@@ -116,6 +119,9 @@ class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 	void print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const override;
 	void on_send_success(const MessagePtr& msg) const override;
 
+	// misc
+	void print_summary(const MessagePtr& msg, bool way) const;
+
 public:
 	using Session::Session;
 	~SimpleSession() = default;
@@ -124,25 +130,28 @@ public:
 //-----------------------------------------------------------------------------------------
 namespace
 {
-	std::string make_id(int val)
+	f8String make_id(int val)
 	{
 		std::ostringstream ostr;
 		ostr << std::setw(8) << std::setfill('0') << val;
 		return std::move(ostr.str());
 	}
 
-	char get_wait_key(timeval wait={})
+	char get_wait_key(int waitms=0)
 	{
 		char ch = '\0';
-		fd_set rfds;
-		FD_ZERO(&rfds);
-		FD_SET(0, &rfds);
-		if (select(1, &rfds, 0, 0, &wait) > 0)
+		struct pollfd pfds { 0, POLLIN };
+		if (poll(&pfds, 1, waitms) > 0 && pfds.revents & POLLIN)
 		{
 			std::cin.get(ch);
 			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 		}
 		return ch;
+	}
+
+	void toggle(f8String_view tag, bool& what)
+	{
+		std::cout << tag << ' ' << ((what ^= true) ? "on" : "off") << std::endl;
 	}
 }
 
@@ -161,18 +170,22 @@ bool Application::options_setup(Options& ops)
 		("g,giveupreset", "number of reliable reconnects to try before resetting seqnums", value<int>(_giveupreset)->default_value("10"))
 		("r,reliable", "start in reliable mode", value<bool>(_reliable)->default_value("true")->implicit_value("false"))
 		("G,generate", "generate NewOrderSingle messages (client)", value<bool>(_generate)->default_value("true")->implicit_value("false"))
-		("I,interval", "generate interval (client, msecs)", value<int>(_interval)->default_value("5000"))
+		("I,interval", "client generation interval (msecs); if -ve use random interval between 0 and -(n)", value<int>(_interval)->default_value("5000"))
 		("H,showheartbeats", "show inbound heartbeats", value<bool>(_hb)->default_value("true")->implicit_value("false"))
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(_libdir))
 		("T,threadname", "prefix thread names with given string", value<f8String>(_tname))
 		("t,states", "show session and reliable session thread state changes", value<bool>(_show_states)->default_value("true")->implicit_value("false"))
 		("U,username", "FIX username used in logon", value<f8String>(_username)->default_value("testuser"))
 		("P,password", "FIX password used in logon (cleartext)", value<f8String>(_password)->default_value("password"))
+		("u,summary", "run in summary display mode", value<bool>(_summary)->default_value("false"))
 		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"));
 	add_postamble(R"(e.g.
-  simpleclisrv -c config/simple_server.xml -s
-  simpleclisrv -c config/simple_client.xml
-  simpleclisrv -015678vhD)");
+simple cli/srv pair:
+   simpleclisrv -c config/simple_server.xml -s
+   simpleclisrv -c config/simple_client.xml
+cli/srv pair with supplied hash pw, random generation interval (~1s), base thread named, run in summary mode:
+   simpleclisrv -sc ../config/simple_server.xml -P 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8 -u -T clisrv
+   simpleclisrv -c ../config/simple_client.xml  -I -1000 -P 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8 -u -T clisrv)");
 	return true;
 }
 
@@ -181,7 +194,6 @@ int Application::main(const std::vector<f8String>& args)
 {
 	try
 	{
-		using namespace std::string_literals;
 		const f8String srvtype = _server ? "server" : "client";
 		if (!has("config"))
 			_clcf = "simple_"s + srvtype + ".xml";
@@ -191,7 +203,7 @@ int Application::main(const std::vector<f8String>& args)
 
 		void *handle = nullptr;
 		f8String errstr;
-		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX44", _libdir, handle, errstr); // load our FIX schema .so
+		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX44_EXAMPLE", _libdir, handle, errstr); // load our FIX schema .so
 		if (!ctxfunc)
 			throw BadSharedLibrary(errstr);
 		std::cout << "loaded: " << _libpath << std::endl;
@@ -205,6 +217,7 @@ int Application::main(const std::vector<f8String>& args)
 		if (has("threadname"))
 			Fix8Pro::base_application_thread_name(_tname); // easier to view threads in ps/top/htop etc
 		Fix8ProInstance fix8pro_instance (1, glogname.c_str()); // warms up timer, setup logmanager, global logger
+		glout_info << "Command line was: \"" << get_cmdline() << '"';
 
 		if (_server)
 		{
@@ -216,7 +229,7 @@ int Application::main(const std::vector<f8String>& args)
 			{
 				if (ms->poll()) // default timeout 250ms
 				{
-					std::thread worker([&]() // run acceptor in new thread
+					std::thread worker([&]() // run acceptor in new thread (not required, just for example)
 					{
 						// we have a new session
 						SessionInstanceBase_ptr srv (ms->create_server_instance());
@@ -224,7 +237,7 @@ int Application::main(const std::vector<f8String>& args)
 						std::cout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
 					});
 					if (worker.joinable())
-						worker.join(); // for mulitple concurrent clients, we wouldn't block here
+						worker.join(); // for multiple concurrent clients, we wouldn't block here
 				}
 			}
 		}
@@ -268,10 +281,16 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 	while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 		&& ses->get_connection()->is_connected() && !term_received)
 	{
-		switch (get_wait_key({0, 100 * 1000})) // 100ms
+		switch (auto ch = get_wait_key(100); ch) // 100ms
 		{
 		case 'l':
 			ses->logout_and_shutdown("goodbye from server");
+			break;
+		case 's':
+			toggle("summary", _summary);
+			break;
+		case 'S':
+			toggle("states", _show_states);
 			break;
 		case 'q':
 			ses->control() |= Session::shutdown;
@@ -280,12 +299,22 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 			exit(1);
 		case 'Q':
 			ses->control() ^= (_hb ? Session::print : Session::printnohb);
-			std::cout << "quiet " << std::boolalpha << (_quiet ^= true) << std::endl;
-			break;
-		case '?':
-			std::cout << "l - logout\nq - disconnect (no logout)\nx - just exit\nQ - toggle quiet\n? - help" << std::endl;
+			toggle("quiet", _quiet);
 			break;
 		default:
+			std::cout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
+			[[fallthrough]];
+		case '?':
+			std::cout <<
+R"(l - logout
+s - toggle summary
+q - disconnect (no logout)
+x - just exit
+Q - toggle quiet
+S - toggle states
+? - help)" << std::endl;
+			break;
+		case 0:
 			break;
 		}
 	}
@@ -301,10 +330,10 @@ void Application::client_session(ClientSessionBase_ptr mc)
 	if (ses->get_login_parameters()._reliable)
 		std::cout << "starting reliable client" << std::endl; // reliable is default
 	mc->start(false, _next_send, _next_receive, ses->get_login_parameters()._davi); // when false, session starts and control returns immediately
-	const timeval wait { _interval / 1000L, (_interval % 1000L) * 1000L };
-	for (bool ok = true; ok && !term_received && !mc->has_given_up(); )
+	for (auto ok = true; ok && !term_received && !mc->has_given_up(); )
 	{
-		switch (get_wait_key({wait}))
+		auto ival = _interval < 0 ? std::uniform_int_distribution<>(0, -_interval)(_eng) : _interval;
+		switch (auto ch = get_wait_key(ival); ch)
 		{
 		case 'l':
 			ses->logout_and_shutdown("goodbye from client");
@@ -314,39 +343,72 @@ void Application::client_session(ClientSessionBase_ptr mc)
 			break;
 		case 'x':
 			exit(1);
+		case 's':
+			toggle("summary", _summary);
+			break;
+		case 'S':
+			toggle("states", _show_states);
+			break;
 		case 'g':
-			std::cout << "generate " << std::boolalpha << (_generate ^= true) << std::endl;
+			toggle("generate", _generate);
 			break;
 		case 'Q':
 			ses->control() ^= (_hb ? Session::print : Session::printnohb);
-			std::cout << "quiet " << std::boolalpha << (_quiet ^= true) << std::endl;
-			break;
-		case '?':
-			std::cout << "l - logout and quit\nq - quit (no logout)\nx - just exit\ng - toggle generate\nQ - toggle quiet\n? - help" << std::endl;
+			toggle("quiet", _quiet);
 			break;
 		default:
+			std::cout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
+			[[fallthrough]];
+		case '?':
+			std::cout <<
+R"(l - logout and quit
+q - quit (no logout)
+x - just exit
+g - toggle generate
+s - toggle summary
+Q - toggle quiet
+S - toggle states
+? - help)" << std::endl;
 			break;
 		case 0:
-			if (_generate)
-			{
-				static unsigned oid = 0;
-				auto nos = make_message<NewOrderSingle>();
-				*nos << nos->make_field<TransactTime>() // defaults to now
-					  << nos->make_field<EffectiveTime>(Tickval(2022, 4, 23, 10, 21, 1, 865765000), TimeIndicator::_with_us) // default is _with_ms
-					  << nos->make_field<ClOrdID>('C' + tp_to_string(Tickval(true).get_time_point(), R"(%Y%m%d)") + make_id(++oid))
-					  << nos->make_field<HandlInst>(HandlInst::AutomatedExecutionNoIntervention)
-					  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, 100)(_eng)) // random qty
-					  << nos->make_field<Price>(std::cauchy_distribution(121.78, 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
-					  << nos->make_field<Symbol>("NYSE::IBM")
-					  << nos->make_field<OrdType>(OrdType::Limit)
-					  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side::Buy : Side::Sell) // coin toss side
-					  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce::count - 1)(_eng) + '0'); // random tif
-				ses->send(std::move(nos));
-			}
+			if (_generate && ses->get_session_state() == States::st_continuous)
+				if (auto optr = generate_order(); optr)
+					ses->send(std::move(optr));
 			break;
 		}
 	}
 	ses->request_stop();
+}
+
+//-----------------------------------------------------------------------------------------
+MessagePtr Application::generate_order()
+{
+	constexpr const std::array<std::tuple<f8String_view, double, int>, 20> instrs
+	{{
+		{ "NASDAQ:AAPL",	163.17,	50 },		{ "NASDAQ:MSFT",	289.86,	50 },
+		{ "NASDAQ:GOOG",	2642.44,	100 },	{ "NASDAQ:AMZN",	2912.82, 100 },
+		{ "NASDAQ:TSLA",	838.29,	120 },	{ "NYSE:BRK-A",	487440., 120 },
+		{ "NASDAQ:FB",		200.06,	120 },	{ "NASDAQ:NVDA",	229.36,	120 },
+		{ "NYSE:UNH",		498.65,	120 },	{ "NYSE:JNJ",		169.48,	120 },
+		{ "NYSE:V",			200.29,	120 },	{ "NYSE:JPM",		134.40,	300 },
+		{ "NYSE:WMT",		142.82,	300 },	{ "NYSE:PG",		155.14,	300 },
+		{ "NYSE:XOM",		84.09,	300 },	{ "NYSE:HD",		324.26,	300 },
+		{ "NYSE:BAC",		40.95,	200 },	{ "NYSE:MC",		330.76,	200 },
+		{ "NYSE:CVX",		158.65,	200 },	{ "NYSE:PFE",		48.65,	200 },
+	}};
+	static unsigned oid = 0;
+	const auto& [sym, price, maxqty] = instrs[std::uniform_int_distribution<>(0, instrs.size() - 1)(_eng)]; // choose instr
+	auto nos = make_message<NewOrderSingle>();
+	*nos << nos->make_field<TransactTime>() // defaults to now
+		  << nos->make_field<Symbol>(sym)
+		  << nos->make_field<ClOrdID>('C' + tp_to_string(Tickval(true).get_time_point(), R"(%Y%m%d)") + make_id(++oid))
+		  << nos->make_field<HandlInst>(std::uniform_int_distribution<>(1, HandlInst::count)(_eng) + '0') // random hi
+		  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, maxqty)(_eng)) // random qty
+		  << nos->make_field<Price>(std::cauchy_distribution(price, 0.1)(_eng), 3)	// using more realistic cauchy 'fat tail'; 3 decimal places if necessary
+		  << nos->make_field<OrdType>(OrdType::Limit)
+		  << nos->make_field<Side>(std::bernoulli_distribution()(_eng) ? Side::Buy : Side::Sell) // coin toss side
+		  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce::count - 1)(_eng) + '0'); // random tif
+	return std::move(nos);
 }
 
 //-----------------------------------------------------------------------------------------
@@ -376,10 +438,37 @@ bool SimpleSession::authenticate(SessionID& id, const MessagePtr& msg)
 }
 
 //-----------------------------------------------------------------------------------------
+void SimpleSession::print_summary(const MessagePtr& msg, bool way) const
+{
+	static const f8String send = COLOUR(Bold, Magenta, "Sent"), recv = COLOUR(Bold, Cyan, "Recv");
+	std::cout	<< (way ? send : recv) << ' ' << msg->Header()->get<SendingTime>()->get()
+					<< ' ' << std::left << std::setw(16) << _ctx._bme.find(msg->get_msgtype())->second._name // query the metadata
+					<< '(' << msg->get_msgtype() << ") seq=" << std::setw(6) << msg->Header()->get<MsgSeqNum>()->get();
+	if (msg->has<Symbol>())
+		std::cout << ' ' << std::setw(12) << msg->get<Symbol>()->get();
+	if (msg->has<Side>())
+		std::cout << ' ' << (msg->get<Side>()->get() == Side::Buy ? 'B' : 'S');
+	if (msg->has<LastQty>())
+		std::cout << ' ' << msg->get<LastQty>()->get();
+	else if (msg->has<OrderQty>())
+		std::cout << ' ' << msg->get<OrderQty>()->get();
+	if (msg->has<Price>())
+		std::cout << " @ " << msg->get<Price>()->get();
+	if (msg->has<OrdStatus>())
+		std::cout << ' ' << msg->get<OrdStatus>()->get_realm()->get_description(msg->get<OrdStatus>()->get_rlm_idx());
+	std::cout << std::endl;
+}
+
+//-----------------------------------------------------------------------------------------
 void SimpleSession::print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const
 {
-	std::cout << "\r-------------------- received --------------------\n";
-	Session::print_message(msg, std::cout, Application::use_colour());
+	if (_app._summary)
+		print_summary(msg, false);
+	else
+	{
+		std::cout << "\r---------------------- Recv ----------------------\n";
+		Session::print_message(msg, std::cout, Application::use_colour());
+	}
 }
 
 //-----------------------------------------------------------------------------------------
@@ -387,9 +476,11 @@ void SimpleSession::on_send_success(const MessagePtr& msg) const
 {
 	if ((_control.has(Session::printnohb) && msg->get_msgtype() == MsgType::Heartbeat)
 		|| !_control.has(Session::print));
+	else if (_app._summary)
+		print_summary(msg, true);
 	else
 	{
-		std::cout << "\r---------------------- sent ----------------------\n";
+		std::cout << "\r---------------------- Sent ----------------------\n";
 		Session::print_message(msg, std::cout, Application::use_colour());
 	}
 }
@@ -501,42 +592,46 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 		*er << er->make_field<OrdStatus>(OrdStatus::New)
 			 << er->make_field<LeavesQty>(qty)
 			 << er->make_field<ExecType>(ExecType::New);
-		send(move(er));
+		send(std::move(er));
 
-		for (OrderQty::this_type remaining_qty = qty, cum_qty = 0; remaining_qty > 0;)
+		if (std::bernoulli_distribution(0.75)(_app._eng)) // 75% trade, 25% rest)
 		{
-			auto trdqty = std::uniform_int_distribution<>(1, remaining_qty)(_app._eng);
-			er = make_message<ExecutionReport>();
-			erb = detail::static_pointer_cast(er);
-			msg->copy_legal(erb);
-			cum_qty += trdqty;
-			*er << er->make_field<OrderID>(oidstr)
-				 << er->make_field<ExecID>('F' + tpstr + make_id(++eoid))
-				 << er->make_field<ExecType>(ExecType::Trade)
-				 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
-				 << er->make_field<LeavesQty>(remaining_qty - trdqty)
-				 << er->make_field<CumQty>(cum_qty)
-				 << er->make_field<LastQty>(trdqty)
-				 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
-
-			// add some repeating groups
-			const auto& nocb = er->find_group<ExecutionReport::NoContraBrokers>();
-			int ncnt = 0;
-			for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
+			auto partfill = std::bernoulli_distribution(0.75)(_app._eng); // 75% partially, 25% fully filled
+			for (OrderQty::this_type remaining_qty = qty, cum_qty = 0; remaining_qty > 0;)
 			{
-				constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
-				auto gr1 = nocb->create_group();
-				auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng);
-				*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb
-						<< er->make_field<ContraTradeQty>(retrdqtycb)
-						<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng))); // random ct
-				trdqtycb -= retrdqtycb;
-				*nocb << std::move(gr1);
-			}
-			*er << er->make_field<NoContraBrokers>(ncnt);
+				auto trdqty = partfill ? std::uniform_int_distribution<>(1, remaining_qty)(_app._eng) : remaining_qty;
+				er = make_message<ExecutionReport>();
+				erb = detail::static_pointer_cast(er);
+				msg->copy_legal(erb);
+				cum_qty += trdqty;
+				*er << er->make_field<OrderID>(oidstr)
+					 << er->make_field<ExecID>('F' + tpstr + make_id(++eoid))
+					 << er->make_field<ExecType>(ExecType::Trade)
+					 << er->make_field<OrdStatus>(remaining_qty == trdqty ? OrdStatus::Filled : OrdStatus::PartiallyFilled)
+					 << er->make_field<LeavesQty>(remaining_qty - trdqty)
+					 << er->make_field<CumQty>(cum_qty)
+					 << er->make_field<LastQty>(trdqty)
+					 << er->make_field<AvgPx>(price, 3); // to 3 decimal places
 
-			send(std::move(er));
-			remaining_qty -= trdqty;
+				// add some repeating groups
+				const auto& nocb = er->find_group<ExecutionReport::NoContraBrokers>();
+				int ncnt = 0;
+				for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
+				{
+					constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
+					auto gr1 = nocb->create_group();
+					auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng); // random qty
+					*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb
+							<< er->make_field<ContraTradeQty>(retrdqtycb)
+							<< er->make_field<ContraTrader>(std::to_string(std::uniform_int_distribution<>(1000, 9999)(_app._eng))); // random ct
+					trdqtycb -= retrdqtycb;
+					*nocb << std::move(gr1);
+				}
+				*er << er->make_field<NoContraBrokers>(ncnt);
+
+				send(std::move(er));
+				remaining_qty -= trdqty;
+			}
 		}
 	}
 	else
@@ -545,7 +640,7 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 			 << er->make_field<LeavesQty>(0)
 			 << er->make_field<OrdRejReason>(std::uniform_int_distribution<>(0, OrdRejReason::count - 1)(_app._eng)) // random orr
 			 << er->make_field<ExecType>(ExecType::Rejected);
-		send(move(er));
+		send(std::move(er));
 	}
 
 	return true;
