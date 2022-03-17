@@ -80,8 +80,7 @@ In our other terminal we'll run our client:
 
 ## CLI options
 
-<details><summary><i>expand</i></summary>
-  <i>These options are defined in </i><tt>Application::options_setup()</tt>. <i>Some of the options are added by </i><tt>Fix8ProApplication</tt>.
+<details><summary><i>These options are defined in </i><tt>Application::options_setup()</tt>. <i>Some of the options are added by </i><tt>Fix8ProApplication</tt>.</summary>
 <p>
 
 ```bash
@@ -157,10 +156,10 @@ cli/srv pair with supplied hash pw, random generation interval (~1s), base threa
 
 ## Sample output
 
-### Output server
+### Server
 
-<details><summary><i>expand</i></summary>
-<i>Shows the server receiving a login, receiving NewOrderSingles and sending ExecutionReports.</i>
+<details>
+<summary><i>Shows the server receiving a login, receiving NewOrderSingles and sending ExecutionReports.</i></summary>
 <p>
 
 ```bash
@@ -1548,8 +1547,7 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 
 ### Screenshots (server)
 
-<details><summary><i>expand</i></summary>
-<i>Shows the server responding to a NewOrderSingle by sending an ExecutionReport.</i>
+<details><summary><i>Shows the server responding to a NewOrderSingle by sending an ExecutionReport.</i></summary>
 <p>
 
 ![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
@@ -1557,8 +1555,7 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 </p>
 </details>
 
-<details><summary><i>expand</i></summary>
-<i>Shows the server sending and receiving messages (summary mode).</i>
+<details><summary><i>Shows the server sending and receiving messages (summary mode).</i></summary>
 <p>
 
 ![Shows the server sending and receiving messages](assets/example_server_summary.png)
@@ -1566,10 +1563,9 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 </p>
 </details>
 
-### Output client
+### Client
 
-<details><summary><i>expand</i></summary>
-<i>Shows the client logging in, sending NewOrderSingles and receiving ExecutionReports. Summary mode was selected.</i>
+<details><summary><i>Shows the client logging in, sending NewOrderSingles and receiving ExecutionReports. Summary mode was selected.</i></summary>
 <p>
 
 ```bash
@@ -1635,8 +1631,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 
 ### Screenshots (client)
 
-<details><summary><i>expand</i></summary>
-<i>Shows the client receiving an ExecutionReport (verbose mode).</i>
+<details><summary><i>Shows the client receiving an ExecutionReport (verbose mode).</i></summary>
 <p>
 
 ![Shows the client receiving an ExecutionReport](assets/example_client_detail.png)
@@ -1644,8 +1639,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 </p>
 </details>
 
-<details><summary><i>expand</i></summary>
-<i>Shows the client sending and receiving messages (summary mode).</i>
+<details><summary><i>Shows the client sending and receiving messages (summary mode).</i></summary>
 <p>
 
 ![Shows the client sending and receiving messages](assets/example_client_summary.png)
@@ -1653,8 +1647,8 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 </p>
 </details>
 
-<details><summary><i>expand</i></summary>
-<i>Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting. Notice the state changes.</i>
+<details><summary><i>Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting. Notice the state changes.</i></summary>
+
 <p>
 
 ![Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting](assets/example_client_reliable.png)
@@ -1664,8 +1658,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 
 ### Screenshots (misc)
 
-<details><summary><i>expand</i></summary>
-<i>Using thread naming and filtering with htop, showing client and server threads.</i>
+<details><summary><i>Using thread naming and filtering with htop, showing client and server threads.</i></summary>
 <p>
 
 ![Thread naming and filtering](assets/example_htop.png)
