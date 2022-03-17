@@ -1547,7 +1547,7 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 <details><summary><i>Shows the server responding to a NewOrderSingle by sending an ExecutionReport.</i></summary>
 <p>
 
-![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
+<kbd> ![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
 
 </p>
 </details>
@@ -1555,7 +1555,7 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 <details><summary><i>Shows the server sending and receiving messages (summary mode).</i></summary>
 <p>
 
-![Shows the server sending and receiving messages](assets/example_server_summary.png)
+<kbd> ![Shows the server sending and receiving messages](assets/example_server_summary.png)
 
 </p>
 </details>
@@ -1629,7 +1629,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 <details><summary><i>Shows the client receiving an ExecutionReport (verbose mode).</i></summary>
 <p>
 
-![Shows the client receiving an ExecutionReport](assets/example_client_detail.png)
+<kbd> ![Shows the client receiving an ExecutionReport](assets/example_client_detail.png)
 
 </p>
 </details>
@@ -1637,7 +1637,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 <details><summary><i>Shows the client sending and receiving messages (summary mode).</i></summary>
 <p>
 
-![Shows the client sending and receiving messages](assets/example_client_summary.png)
+<kbd> ![Shows the client sending and receiving messages](assets/example_client_summary.png)
 
 </p>
 </details>
@@ -1646,7 +1646,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 
 <p>
 
-![Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting](assets/example_client_reliable.png)
+<kbd> ![Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting](assets/example_client_reliable.png)
 
 </p>
 </details>
@@ -1656,7 +1656,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 <details><summary><i>Using thread naming and filtering with htop, showing client and server threads.</i></summary>
 <p>
 
-![Thread naming and filtering](assets/example_htop.png)
+<kbd> ![Thread naming and filtering](assets/example_htop.png)
 
 </p>
 </details>
