@@ -104,6 +104,7 @@ target_link_libraries(FIX44_EXAMPLE PRIVATE fix8pro fix8proutils)
 # target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
 
 add_executable(simpleclisrv src/simpleclisrv.cpp)
+include_directories(src)
 target_link_libraries(simpleclisrv PRIVATE FIX44_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)

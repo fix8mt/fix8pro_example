@@ -58,104 +58,14 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <fix8pro/utils/colours.hpp>
 #define COLOUR(x,y,z) Colours::make_string16({Attribute::x, Colour::y},z,Application::use_colour())
 
-//-----------------------------------------------------------------------------------------
-#include <FIX44_EXAMPLE_types.hpp>
-#include <FIX44_EXAMPLE_router.hpp>
-#include <FIX44_EXAMPLE_classes.hpp>
-
-//-----------------------------------------------------------------------------------------
-using namespace cxxopts;
-using namespace FIX8;
-using namespace FIX44_EXAMPLE;
-using namespace std::string_literals;
-
-//-----------------------------------------------------------------------------------------
-class Application final : public Fix8ProApplication
-{
-	int _giveupreset, _interval;
-	bool _server, _reliable, _hb, _quiet, _show_states, _generate, _summary;
-	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password;
-	unsigned _next_send, _next_receive;
-	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
-
-	int main(const std::vector<f8String>& args) override; // required
-	bool options_setup(cxxopts::Options& ops) override;
-
-	void server_session(SessionInstanceBase_ptr inst, int scnt);
-	void client_session(ClientSessionBase_ptr mc);
-	MessagePtr generate_order();
-
-public:
-	using Fix8ProApplication::Fix8ProApplication;
-	~Application() = default;
-
-	friend class SimpleSession;
-};
+#include <simpleclisrv.hpp>
 
 //-----------------------------------------------------------------------------------------
 // We're using Fix8ProApplication so we need to declare the instance
 Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_string("v2.3"), "Fix8Pro sample client/server");
+// teestream target
+std::ostream *ccout;
 
-//-----------------------------------------------------------------------------------------
-/// Universal session for client and server
-/// Note: inheriting from the compiler generated router requires passing the -U flag to the fix8pro compiler f8pc (see CMakeLists.txt)
-class SimpleSession final : public Session, FIX44_EXAMPLE_Router
-{
-	Application& _app { Application::get_instance<Application>() };
-
-	// ExecutionReport handler (client)
-	bool operator()(const ExecutionReport *msg) override;
-	// NewOrderSingle handler (server)
-	bool operator()(const NewOrderSingle *msg) override;
-
-	// required
-	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
-
-	// optional overrides
-	MessagePtr generate_logon(unsigned heartbeat_interval, const f8String davi) override;
-	bool authenticate(SessionID& id, const MessagePtr& msg) override;
-	void state_change(States::SessionStates before, States::SessionStates after, const char *where=nullptr) override;
-	void reliable_state_change(States::ReliableSessionStates before, States::ReliableSessionStates after, std::any closure, const char *where=nullptr) override;
-	void print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const override;
-	void on_send_success(const MessagePtr& msg) const override;
-
-	// misc
-	void print_summary(const MessagePtr& msg, bool way) const;
-
-public:
-	using Session::Session;
-	~SimpleSession() = default;
-};
-
-//-----------------------------------------------------------------------------------------
-namespace
-{
-	f8String make_id(int val)
-	{
-		std::ostringstream ostr;
-		ostr << std::setw(8) << std::setfill('0') << val;
-		return std::move(ostr.str());
-	}
-
-	char get_wait_key(int waitms=0)
-	{
-		char ch = '\0';
-		struct pollfd pfds { 0, POLLIN };
-		if (poll(&pfds, 1, waitms) > 0 && pfds.revents & POLLIN)
-		{
-			std::cin.get(ch);
-			std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-		}
-		return ch;
-	}
-
-	void toggle(f8String_view tag, bool& what)
-	{
-		std::cout << tag << ' ' << ((what ^= true) ? "on" : "off") << std::endl;
-	}
-}
-
-//-----------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------
 bool Application::options_setup(Options& ops)
 {
@@ -178,6 +88,7 @@ bool Application::options_setup(Options& ops)
 		("U,username", "FIX username used in logon", value<f8String>(_username)->default_value("testuser"))
 		("P,password", "FIX password used in logon (cleartext)", value<f8String>(_password)->default_value("password"))
 		("u,summary", "run in summary display mode", value<bool>(_summary)->default_value("false"))
+		("k,capture", "capture all screen output to specified file", value<f8String>(_capfile))
 		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"));
 	add_postamble(R"(e.g.
 simple cli/srv pair:
@@ -194,6 +105,15 @@ int Application::main(const std::vector<f8String>& args)
 {
 	try
 	{
+		// optional teestream (capture)
+		std::unique_ptr<std::ostream> ofptr(has("capture") ? new std::ofstream(_capfile.c_str(), std::ios::trunc) : nullptr);
+		bool validofile(!_capfile.empty() && *ofptr);
+		std::unique_ptr<std::ostream, f8_deleter> cofs(validofile ? new teestream(std::cout, *ofptr) : &std::cout, f8_deleter(validofile));
+		ccout = cofs.get();
+		if (validofile)
+			*ccout << "capturing screen output to " << _capfile << std::endl;
+
+		// load config
 		const f8String srvtype = _server ? "server" : "client";
 		if (!has("config"))
 			_clcf = "simple_"s + srvtype + ".xml";
@@ -201,29 +121,34 @@ int Application::main(const std::vector<f8String>& args)
 			throw InvalidConfiguration(_clcf + " not found");
 		std::unique_ptr<std::istream> istr = std::make_unique<std::ifstream>(_clcf.c_str()); // our config file as a stream
 
+		// load our FIX schema .so
 		void *handle = nullptr;
 		f8String errstr;
-		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX44_EXAMPLE", _libdir, handle, errstr); // load our FIX schema .so
+		auto [ctxfunc, _libpath] = load_cast_ctx_from_so("FIX44_EXAMPLE", _libdir, handle, errstr);
 		if (!ctxfunc)
 			throw BadSharedLibrary(errstr);
-		std::cout << "loaded: " << _libpath << std::endl;
+		*ccout << "loaded: " << _libpath << std::endl;
 
+		// setup lognames
 		f8String glogname = "./run/" + srvtype;
 		if (!has("log"))
 			glogname += "_%{DATE}_global.log;latest_" + srvtype + "_global.log"; // logger expands DATE
 		else
 			glogname += _global_logger_name + ";latest_" + srvtype + '_' + _global_logger_name; // logger adds automatic symlink to latest
 
+		// easier to view threads in ps/top/htop etc
 		if (has("threadname"))
-			Fix8Pro::base_application_thread_name(_tname); // easier to view threads in ps/top/htop etc
-		Fix8ProInstance fix8pro_instance (1, glogname.c_str()); // warms up timer, setup logmanager, global logger
+			Fix8Pro::base_application_thread_name(_tname);
+
+		// warms up timer, setup logmanager, global logger
+		Fix8ProInstance fix8pro_instance (1, glogname.c_str());
 		glout_info << "Command line was: \"" << get_cmdline() << '"';
 
 		if (_server)
 		{
 			ServerSessionBase_ptr ms = std::make_unique<ServerSession<SimpleSession>>(ctxfunc(), *istr, _sses);
 			constexpr f8String_view prompt {"Waiting for new connection (q=quit)..."};
-			std::cout << prompt << std::endl;
+			*ccout << prompt << std::endl;
 
 			for (unsigned scnt = 0; !term_received && get_wait_key() != 'q';)
 			{
@@ -234,7 +159,7 @@ int Application::main(const std::vector<f8String>& args)
 						// we have a new session
 						SessionInstanceBase_ptr srv (ms->create_server_instance());
 						server_session(std::move(srv), scnt++);
-						std::cout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
+						*ccout << "Client session(" << scnt << ") finished. " << prompt << std::endl;
 					});
 					if (worker.joinable())
 						worker.join(); // for multiple concurrent clients, we wouldn't block here
@@ -265,7 +190,7 @@ int Application::main(const std::vector<f8String>& args)
 	}
 
 	if (term_received)
-		std::cout << "terminated." << std::endl;
+		*ccout << "terminated." << std::endl;
 	return 0;
 }
 
@@ -276,7 +201,7 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 	auto *ses = inst->session_t_ptr<SimpleSession>(); // obtains a pointer to your session
 	if (!_quiet)
 		ses->control() |= (_hb ? Session::print : Session::printnohb); // turn on the built-in FIX printer
-	std::cout << "Client session(" << scnt << ") connection established." << std::endl;
+	*ccout << "Client session(" << scnt << ") connection established." << std::endl;
 	inst->start(false, _next_send, _next_receive); // when false, session starts and control returns immediately
 	while (!ses->is_shutdown() && ses->get_session_state() != States::st_logoff_sent && ses->get_connection()
 		&& ses->get_connection()->is_connected() && !term_received)
@@ -287,10 +212,10 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 			ses->logout_and_shutdown("goodbye from server");
 			break;
 		case 's':
-			toggle("summary", _summary);
+			toggle("summary", _summary, *ccout);
 			break;
 		case 'S':
-			toggle("states", _show_states);
+			toggle("states", _show_states, *ccout);
 			break;
 		case 'q':
 			ses->control() |= Session::shutdown;
@@ -299,13 +224,13 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 			exit(1);
 		case 'Q':
 			ses->control() ^= (_hb ? Session::print : Session::printnohb);
-			toggle("quiet", _quiet);
+			toggle("quiet", _quiet, *ccout);
 			break;
 		default:
-			std::cout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
+			*ccout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
 			[[fallthrough]];
 		case '?':
-			std::cout <<
+			*ccout <<
 R"(l - logout
 s - toggle summary
 q - disconnect (no logout)
@@ -328,7 +253,7 @@ void Application::client_session(ClientSessionBase_ptr mc)
 	if (!_quiet)
 		ses->control() |= (_hb ? Session::print : Session::printnohb); // turn on the built-in FIX printer
 	if (ses->get_login_parameters()._reliable)
-		std::cout << "starting reliable client" << std::endl; // reliable is default
+		*ccout << "starting reliable client" << std::endl; // reliable is default
 	mc->start(false, _next_send, _next_receive, ses->get_login_parameters()._davi); // when false, session starts and control returns immediately
 	for (auto ok = true; ok && !term_received && !mc->has_given_up(); )
 	{
@@ -344,23 +269,23 @@ void Application::client_session(ClientSessionBase_ptr mc)
 		case 'x':
 			exit(1);
 		case 's':
-			toggle("summary", _summary);
+			toggle("summary", _summary, *ccout);
 			break;
 		case 'S':
-			toggle("states", _show_states);
+			toggle("states", _show_states, *ccout);
 			break;
 		case 'g':
-			toggle("generate", _generate);
+			toggle("generate", _generate, *ccout);
 			break;
 		case 'Q':
 			ses->control() ^= (_hb ? Session::print : Session::printnohb);
-			toggle("quiet", _quiet);
+			toggle("quiet", _quiet, *ccout);
 			break;
 		default:
-			std::cout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
+			*ccout << COLOUR(Bold, Red, "unknown cmd: ") << (isprint(ch) ? ch : ' ') << std::endl;
 			[[fallthrough]];
 		case '?':
-			std::cout <<
+			*ccout <<
 R"(l - logout and quit
 q - quit (no logout)
 x - just exit
@@ -441,22 +366,22 @@ bool SimpleSession::authenticate(SessionID& id, const MessagePtr& msg)
 void SimpleSession::print_summary(const MessagePtr& msg, bool way) const
 {
 	static const f8String send = COLOUR(Bold, Magenta, "Sent"), recv = COLOUR(Bold, Cyan, "Recv");
-	std::cout	<< (way ? send : recv) << ' ' << msg->Header()->get<SendingTime>()->get()
+	*ccout << (way ? send : recv) << ' ' << msg->Header()->get<SendingTime>()->get()
 					<< ' ' << std::left << std::setw(16) << _ctx._bme.find(msg->get_msgtype())->second._name // query the metadata
 					<< '(' << msg->get_msgtype() << ") seq=" << std::setw(6) << msg->Header()->get<MsgSeqNum>()->get();
 	if (msg->has<Symbol>())
-		std::cout << ' ' << std::setw(12) << msg->get<Symbol>()->get();
+		*ccout << ' ' << std::setw(12) << msg->get<Symbol>()->get();
 	if (msg->has<Side>())
-		std::cout << ' ' << (msg->get<Side>()->get() == Side::Buy ? 'B' : 'S');
+		*ccout << ' ' << (msg->get<Side>()->get() == Side::Buy ? 'B' : 'S');
 	if (msg->has<LastQty>())
-		std::cout << ' ' << msg->get<LastQty>()->get();
+		*ccout << ' ' << msg->get<LastQty>()->get();
 	else if (msg->has<OrderQty>())
-		std::cout << ' ' << msg->get<OrderQty>()->get();
+		*ccout << ' ' << msg->get<OrderQty>()->get();
 	if (msg->has<Price>())
-		std::cout << " @ " << msg->get<Price>()->get();
+		*ccout << " @ " << msg->get<Price>()->get();
 	if (msg->has<OrdStatus>())
-		std::cout << ' ' << msg->get<OrdStatus>()->get_realm()->get_description(msg->get<OrdStatus>()->get_rlm_idx());
-	std::cout << std::endl;
+		*ccout << ' ' << msg->get<OrdStatus>()->get_realm()->get_description(msg->get<OrdStatus>()->get_rlm_idx());
+	*ccout << std::endl;
 }
 
 //-----------------------------------------------------------------------------------------
@@ -466,8 +391,8 @@ void SimpleSession::print_message(const MessagePtr& msg, std::ostream& os, bool 
 		print_summary(msg, false);
 	else
 	{
-		std::cout << "\r---------------------- Recv ----------------------\n";
-		Session::print_message(msg, std::cout, Application::use_colour());
+		*ccout << "---------------------- Recv ----------------------\n";
+		Session::print_message(msg, *ccout, Application::use_colour());
 	}
 }
 
@@ -480,8 +405,8 @@ void SimpleSession::on_send_success(const MessagePtr& msg) const
 		print_summary(msg, true);
 	else
 	{
-		std::cout << "\r---------------------- Sent ----------------------\n";
-		Session::print_message(msg, std::cout, Application::use_colour());
+		*ccout << "---------------------- Sent ----------------------\n";
+		Session::print_message(msg, *ccout, Application::use_colour());
 	}
 }
 
@@ -512,11 +437,11 @@ void SimpleSession::state_change(States::SessionStates before, States::SessionSt
 			COLOUR(Bold, Blue, get_session_state_string(States::st_resend_request_received))
 		};
 		if (_loginParameters._reliable) // set by framework if session was started as reliable
-			std::cout << "   ";
-		std::cout << state_colours[before] << " => " << state_colours[after];
+			*ccout << "   ";
+		*ccout << state_colours[before] << " => " << state_colours[after];
 	//	if (where)
-	//		std::cout << " (" << where << ')';
-		std::cout << std::endl;
+	//		*ccout << " (" << where << ')';
+		*ccout << std::endl;
 	}
 
 	// some tweaks to solve typical ReliableClient / Server gripes
@@ -552,12 +477,12 @@ void SimpleSession::reliable_state_change(States::ReliableSessionStates before, 
 			COLOUR(Reverse, Magenta, get_reliable_session_state_string(States::rst_starting)),
 			COLOUR(Reverse, Magenta, get_reliable_session_state_string(States::rst_stopping))
 		};
-		std::cout << state_colours[before] << " => " << state_colours[after];
+		*ccout << state_colours[before] << " => " << state_colours[after];
 		if (closure.has_value())
-			std::cout << " (" << std::any_cast<unsigned>(closure) << ") attempt(s)";
+			*ccout << " (" << std::any_cast<unsigned>(closure) << ") attempt(s)";
 	//	if (where)
-	//		std::cout << " (" << where << ')';
-		std::cout << std::endl;
+	//		*ccout << " (" << where << ')';
+		*ccout << std::endl;
 	}
 }
 
