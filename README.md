@@ -13,10 +13,9 @@
 6.   [To run](#to-run)
 7.   [CLI options](#cli-options)
 8.   [Sample output](#sample-output)
-      1.   [Output server](#output-server)
-      1.   [Screenshot server](#screenshot-server)
-      1.   [Output client](#output-client)
-      1.   [Screenshot client](#screenshot-client)
+      1.   [Server](#server)
+      1.   [Client](#client)
+      1.   [Misc](#misc)
 
 ------------------------------------------------------------------------
 ## Introduction
@@ -1545,8 +1544,6 @@ Client session(1) finished. Waiting for new connection (q=quit)...
 </p>
 </details>
 
-### Screenshots (server)
-
 <details><summary><i>Shows the server responding to a NewOrderSingle by sending an ExecutionReport.</i></summary>
 <p>
 
@@ -1629,8 +1626,6 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 </p>
 </details>
 
-### Screenshots (client)
-
 <details><summary><i>Shows the client receiving an ExecutionReport (verbose mode).</i></summary>
 <p>
 
@@ -1656,7 +1651,7 @@ Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
 </p>
 </details>
 
-### Screenshots (misc)
+### Misc
 
 <details><summary><i>Using thread naming and filtering with htop, showing client and server threads.</i></summary>
 <p>
