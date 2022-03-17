@@ -20,16 +20,18 @@
 
 ------------------------------------------------------------------------
 ## Introduction
-You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example). For high performance and rapid development using a range of modern languages, choose UFE.
+You have two main options when you develop a FIX application using Fix8Pro. For super high performance close to the metal, choose Fix8Pro C++ Framework (this example).
+For high performance and rapid development using a range of modern languages, choose UFE.
 
-The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++) on our [github repo](https://github.com/fix8mt/ufeed_bindings).
+The UFE package comes with freely available high performance UFEed© client adaptors. You can find full source code and instructions for all our UFEed adaptors (Python, Java, C# and C++)
+on our [github repo](https://github.com/fix8mt/ufeed_bindings).
 
 This brief example demonstrates how to create a client and a server that can listen and accept or initiate FIX sessions.
 
 This example uses the standard FIX44 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
 
 ## To download
-There are two branches: `master` (stable version) and `dev` (latest cutting edge). Optionally specify the `dev` branch when you clone:
+There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version) and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge). Optionally specify the `dev` branch when you clone:
 ```bash
 git clone https://github.com/fix8mt/fix8pro_example.git [-b dev]
 cd fix8pro_example
@@ -90,11 +92,12 @@ Usage:
 
   -c, --config arg         xml config (default: simple_client.xml or
                            simple_server.xml)
-  -l, --log arg            global log filename (default: global.log)
-  -V, --serversession arg  name of server session profile to use (default:
-                           SRV)
-  -C, --clientsession arg  name of client session profile to use (default:
-                           CLI)
+  -l, --log arg            global log filename (default:
+                           ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)
+  -V, --serversession arg  name of server session profile in xml config to
+                           use (default: SRV)
+  -C, --clientsession arg  name of client session profile in xml config to
+                           use (default: CLI)
   -q, --quiet              do not print fix output
   -R, --receive arg        set next expected receive sequence number
                            (default: 0)
@@ -103,9 +106,21 @@ Usage:
   -g, --giveupreset arg    number of reliable reconnects to try before
                            resetting seqnums (default: 10)
   -r, --reliable           start in reliable mode (default: true)
+  -G, --generate           generate NewOrderSingle messages (client)
+                           (default: true)
+  -I, --interval arg       client generation interval (msecs); if -ve use
+                           random interval between 0 and -(n) (default: 5000)
   -H, --showheartbeats     show inbound heartbeats (default: true)
   -L, --libpath arg        library path to load Fix8 schema object, default
                            path or LD_LIBRARY_PATH
+  -T, --threadname arg     prefix thread names with given string
+  -t, --states             show session and reliable session thread state
+                           changes (default: true)
+  -U, --username arg       FIX username used in logon (default: testuser)
+  -P, --password arg       FIX password used in logon (cleartext) (default:
+                           password)
+  -u, --summary            run in summary display mode
+  -k, --capture arg        capture all screen output to specified file
   -s, --server             run in server mode (default client mode)
   -D, --debug              debug mode
 
@@ -129,8 +144,12 @@ Usage:
                      (? <enter> for help)
 
 e.g.
-  simpleclisrv -c config/simple_server.xml -s
-  simpleclisrv -c config/simple_client.xml
+simple cli/srv pair:
+   simpleclisrv -c config/simple_server.xml -s
+   simpleclisrv -c config/simple_client.xml
+cli/srv pair with supplied hash pw, random generation interval (~1s), base thread named, run in summary mode:
+   simpleclisrv -sc ../config/simple_server.xml -P 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8 -u -T clisrv
+   simpleclisrv -c ../config/simple_client.xml  -I -1000 -P 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8 -u -T clisrv
 ```
 
 </p>
@@ -141,502 +160,1408 @@ e.g.
 ### Output server
 
 <details><summary><i>expand</i></summary>
+<i>Shows the server receiving a login, receiving NewOrderSingles and sending ExecutionReports.</i>
 <p>
 
 ```bash
 % ./simpleclisrv -c ../config/simple_server.xml -s
-loaded: libFIX42d.so
-Client session(1) connection established.
-none => wait_for_logon (../runtime/session.cpp:250)
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     69
-   MsgType (35)                       Logon (A)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     1
-   SendingTime (52)                   20211210-05:08:18.993
-Logon ("A")
-   EncryptMethod (98)                 None (0)
-   HeartBtInt (108)                   10
-trailer ("trailer")
-   CheckSum (10)                      105
-wait_for_logon => logon_received (../runtime/session.cpp:735)
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     69
-   MsgType (35)                       Logon (A)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     1
-   SendingTime (52)                   20211210-05:08:18.999
-Logon ("A")
-   EncryptMethod (98)                 0
-   HeartBtInt (108)                   10
-trailer ("trailer")
-   CheckSum (10)                      111
-logon_received => continuous (../runtime/session.cpp:1022)
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     2
-   SendingTime (52)                   20211210-05:08:23.992
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord1
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   TransactTime (60)                  20211210-05:08:23.991
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.635
-   TimeInForce (59)                   FillOrKill (4)
-trailer ("trailer")
-   CheckSum (10)                      012
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     2
-   SendingTime (52)                   20211210-05:08:23.993
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec1
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     0
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  4
-   LeavesQty (151)                    25
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      172
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     3
-   SendingTime (52)                   20211210-05:08:24.006
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec2
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    21
-   LeavesQty (151)                    4
-   CumQty (14)                        21
-   AvgPx (6)                          119.63
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      210
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     198
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     4
-   SendingTime (52)                   20211210-05:08:24.007
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec3
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     2
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    4
-   LeavesQty (151)                    0
-   CumQty (14)                        25
-   AvgPx (6)                          119.63
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      166
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     3
-   SendingTime (52)                   20211210-05:08:29.008
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord2
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   TransactTime (60)                  20211210-05:08:29.008
-   OrderQty (38)                      14
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.944
-   TimeInForce (59)                   FillOrKill (4)
-trailer ("trailer")
-   CheckSum (10)                      005
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     5
-   SendingTime (52)                   20211210-05:08:29.010
-ExecutionReport ("8")
-   OrderID (37)                       ord2
-   ClOrdID (11)                       ord2
-   ExecID (17)                        exec4
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     0
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      14
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.94
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  4
-   LeavesQty (151)                    14
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:29.008
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      162
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     6
-   SendingTime (52)                   20211210-05:08:29.023
-ExecutionReport ("8")
-   OrderID (37)                       ord2
-   ClOrdID (11)                       ord2
-   ExecID (17)                        exec5
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     2
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      14
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.94
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    14
-   LeavesQty (151)                    0
-   CumQty (14)                        14
-   AvgPx (6)                          119.94
-   TransactTime (60)                  20211210-05:08:29.008
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      225
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     4
-   SendingTime (52)                   20211210-05:08:34.028
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord3
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   TransactTime (60)                  20211210-05:08:34.028
-   OrderQty (38)                      20
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.706
-   TimeInForce (59)                   FillOrKill (4)
-trailer ("trailer")
-   CheckSum (10)                      252
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     7
-   SendingTime (52)                   20211210-05:08:34.029
-ExecutionReport ("8")
-   OrderID (37)                       ord3
-   ClOrdID (11)                       ord3
-   ExecID (17)                        exec6
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     0
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      20
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.71
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  4
-   LeavesQty (151)                    20
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:34.028
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      161
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     8
-   SendingTime (52)                   20211210-05:08:34.030
-ExecutionReport ("8")
-   OrderID (37)                       ord3
-   ClOrdID (11)                       ord3
-   ExecID (17)                        exec7
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     2
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      20
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.71
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    20
-   LeavesQty (151)                    0
-   CumQty (14)                        20
-   AvgPx (6)                          119.71
-   TransactTime (60)                  20211210-05:08:34.028
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      204
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     5
-   SendingTime (52)                   20211210-05:08:39.033
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord4
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   TransactTime (60)                  20211210-05:08:39.033
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.451
-   TimeInForce (59)                   FillOrKill (4)
-trailer ("trailer")
-   CheckSum (10)                      246
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     9
-   SendingTime (52)                   20211210-05:08:39.034
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec8
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     0
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  4
-   LeavesQty (151)                    21
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      164
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     10
-   SendingTime (52)                   20211210-05:08:39.048
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec9
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    18
-   LeavesQty (151)                    3
-   CumQty (14)                        18
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      250
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     11
-   SendingTime (52)                   20211210-05:08:39.049
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec10
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    2
-   LeavesQty (151)                    1
-   CumQty (14)                        20
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      228
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     12
-   SendingTime (52)                   20211210-05:08:39.050
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec11
-   ExecTransType (20)                 0
-   ExecType (150)                     0
-   OrdStatus (39)                     2
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    1
-   LeavesQty (151)                    0
-   CumQty (14)                        21
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      222
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     68
-   MsgType (35)                       Logout (5)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     6
-   SendingTime (52)                   20211210-05:08:40.565
-Logout ("5")
-   Text (58)                          goodbye
-trailer ("trailer")
-   CheckSum (10)                      212
-continuous => logoff_received (../runtime/session.cpp:1063)
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     85
-   MsgType (35)                       Logout (5)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     13
-   SendingTime (52)                   20211210-05:08:40.566
-Logout ("5")
-   Text (58)                          remote initiated logout
-trailer ("trailer")
-   CheckSum (10)                      058
-logoff_received => logoff_sent_and_received (../runtime/session.cpp:1076)
-logoff_sent_and_received => session_terminated (../runtime/session.cpp:358)
-Client session(1) finished. Waiting for new connection...
-^C*** Interrupt(2) ***
-terminated.
+loaded: libFIX44_EXAMPLEd.so
+Waiting for new connection (q=quit)...
+Client session(0) connection established.
+none => wait_for_logon
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              151
+   MsgType (35) <String>                Logon (A)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              1
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:19.747
+Logon (A)
+   EncryptMethod (98) <int>             None (0)
+   HeartBtInt (108) <int>               10
+   Username (553) <String>              testuser
+   Password (554) <String>              5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+trailer
+   CheckSum (10) <String>               192
+wait_for_logon => logon_received
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              151
+   MsgType (35) <String>                Logon (A)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              1
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:19.756
+Logon (A)
+   EncryptMethod (98) <int>             None (0)
+   HeartBtInt (108) <int>               10
+   Username (553) <String>              testuser
+   Password (554) <String>              5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+trailer
+   CheckSum (10) <String>               192
+logon_received => continuous
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              151
+   MsgType (35) <String>                NewOrderSingle (D)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              2
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.247
+NewOrderSingle (D)
+   ClOrdID (11) <String>                C2022031700000001
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+trailer
+   CheckSum (10) <String>               100
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              224
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              2
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.250
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000001
+   ClOrdID (11) <String>                C2022031700000001
+   ExecID (17) <String>                 E2022031700000001
+   ExecType (150) <char>                New (0)
+   OrdStatus (39) <char>                New (0)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+   LastCapacity (29) <char>             Principal (4)
+   LeavesQty (151) <Qty>                9
+   CumQty (14) <Qty>                    0
+   AvgPx (6) <Price>                    0
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+trailer
+   CheckSum (10) <String>               153
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              284
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              3
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.252
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000001
+   ClOrdID (11) <String>                C2022031700000001
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          STANS
+      ContraTrader (337) <String>          6766
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          6112
+      ContraTradeQty (437) <Qty>           2
+   ExecID (17) <String>                 F2022031700000002
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+   LastQty (32) <Qty>                   4
+   LeavesQty (151) <Qty>                5
+   CumQty (14) <Qty>                    4
+   AvgPx (6) <Price>                    200.14
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+trailer
+   CheckSum (10) <String>               165
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              283
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              4
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.253
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000001
+   ClOrdID (11) <String>                C2022031700000001
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          AVR1
+      ContraTrader (337) <String>          6680
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          HULZ
+      ContraTrader (337) <String>          9436
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000003
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                3
+   CumQty (14) <Qty>                    6
+   AvgPx (6) <Price>                    200.14
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+trailer
+   CheckSum (10) <String>               072
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              283
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              5
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.254
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000001
+   ClOrdID (11) <String>                C2022031700000001
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          9800
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          4574
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000004
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                1
+   CumQty (14) <Qty>                    8
+   AvgPx (6) <Price>                    200.14
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+trailer
+   CheckSum (10) <String>               099
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              259
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              6
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:22.255
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000001
+   ClOrdID (11) <String>                C2022031700000001
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 1
+   NoContraBrokers (Repeating group 1/1)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          6373
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000005
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                Filled (2)
+   Symbol (55) <String> [Instrument]    NASDAQ:FB
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   9
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   200.14
+   TimeInForce (59) <char>              AtTheOpening (2)
+   LastQty (32) <Qty>                   1
+   LeavesQty (151) <Qty>                0
+   CumQty (14) <Qty>                    9
+   AvgPx (6) <Price>                    200.14
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:22.247
+   HandlInst (21) <char>                AutomatedExecutionNoIntervention (1)
+trailer
+   CheckSum (10) <String>               123
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              151
+   MsgType (35) <String>                NewOrderSingle (D)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              3
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.716
+NewOrderSingle (D)
+   ClOrdID (11) <String>                C2022031700000002
+   HandlInst (21) <char>                ManualOrder (3)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+trailer
+   CheckSum (10) <String>               166
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              225
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              7
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.718
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   ExecID (17) <String>                 E2022031700000006
+   ExecType (150) <char>                New (0)
+   OrdStatus (39) <char>                New (0)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastCapacity (29) <char>             Principal (4)
+   LeavesQty (151) <Qty>                82
+   CumQty (14) <Qty>                    0
+   AvgPx (6) <Price>                    0
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               031
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              313
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              8
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.721
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          NYVY
+      ContraTrader (337) <String>          6506
+      ContraTradeQty (437) <Qty>           12
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          STANS
+      ContraTrader (337) <String>          7178
+      ContraTradeQty (437) <Qty>           17
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          8836
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000007
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   30
+   LeavesQty (151) <Qty>                52
+   CumQty (14) <Qty>                    30
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               242
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              360
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              9
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.722
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 5
+   NoContraBrokers (Repeating group 1/5)
+      ContraBroker (375) <String>          ORTA
+      ContraTrader (337) <String>          8990
+      ContraTradeQty (437) <Qty>           11
+   NoContraBrokers (Repeating group 2/5)
+      ContraBroker (375) <String>          STANS
+      ContraTrader (337) <String>          4305
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 3/5)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          5673
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 4/5)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          4569
+      ContraTradeQty (437) <Qty>           7
+   NoContraBrokers (Repeating group 5/5)
+      ContraBroker (375) <String>          NXPR
+      ContraTrader (337) <String>          5420
+      ContraTradeQty (437) <Qty>           2
+   ExecID (17) <String>                 F2022031700000008
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   24
+   LeavesQty (151) <Qty>                28
+   CumQty (14) <Qty>                    54
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               064
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              360
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              10
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.724
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 5
+   NoContraBrokers (Repeating group 1/5)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          3406
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 2/5)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          9685
+      ContraTradeQty (437) <Qty>           11
+   NoContraBrokers (Repeating group 3/5)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          9709
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 4/5)
+      ContraBroker (375) <String>          NYVY
+      ContraTrader (337) <String>          9087
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 5/5)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          1591
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000009
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   16
+   LeavesQty (151) <Qty>                12
+   CumQty (14) <Qty>                    70
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               245
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              309
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              11
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.725
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          1747
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          1693
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          9667
+      ContraTradeQty (437) <Qty>           2
+   ExecID (17) <String>                 F2022031700000010
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   6
+   LeavesQty (151) <Qty>                6
+   CumQty (14) <Qty>                    76
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               230
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              285
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              12
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.726
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          6258
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          NXPR
+      ContraTrader (337) <String>          5231
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000011
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                4
+   CumQty (14) <Qty>                    78
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               047
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              285
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              13
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.727
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          NXPR
+      ContraTrader (337) <String>          4452
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          5749
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000012
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                2
+   CumQty (14) <Qty>                    80
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               040
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              285
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              14
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:23.728
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000002
+   ClOrdID (11) <String>                C2022031700000002
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          2095
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          8074
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000013
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                Filled (2)
+   Symbol (55) <String> [Instrument]    NYSE:XOM
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   82
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   83.397
+   TimeInForce (59) <char>              GoodTillCancel (1)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                0
+   CumQty (14) <Qty>                    82
+   AvgPx (6) <Price>                    83.397
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:23.716
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               008
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              153
+   MsgType (35) <String>                NewOrderSingle (D)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              4
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.369
+NewOrderSingle (D)
+   ClOrdID (11) <String>                C2022031700000003
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+trailer
+   CheckSum (10) <String>               012
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              229
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              15
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.371
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   ExecID (17) <String>                 E2022031700000014
+   ExecType (150) <char>                New (0)
+   OrdStatus (39) <char>                New (0)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastCapacity (29) <char>             Principal (4)
+   LeavesQty (151) <Qty>                219
+   CumQty (14) <Qty>                    0
+   AvgPx (6) <Price>                    0
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               222
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              319
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              16
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.374
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          9289
+      ContraTradeQty (437) <Qty>           19
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          1891
+      ContraTradeQty (437) <Qty>           160
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          AVR1
+      ContraTrader (337) <String>          3676
+      ContraTradeQty (437) <Qty>           5
+   ExecID (17) <String>                 F2022031700000015
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   184
+   LeavesQty (151) <Qty>                35
+   CumQty (14) <Qty>                    184
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               180
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              292
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              17
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.376
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          5680
+      ContraTradeQty (437) <Qty>           10
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          9813
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000016
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   11
+   LeavesQty (151) <Qty>                24
+   CumQty (14) <Qty>                    195
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               104
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              314
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              18
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.377
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          3298
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          AVR1
+      ContraTrader (337) <String>          4412
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          1654
+      ContraTradeQty (437) <Qty>           2
+   ExecID (17) <String>                 F2022031700000017
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   5
+   LeavesQty (151) <Qty>                19
+   CumQty (14) <Qty>                    200
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               180
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              314
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              19
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.378
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          HULZ
+      ContraTrader (337) <String>          6923
+      ContraTradeQty (437) <Qty>           7
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          6374
+      ContraTradeQty (437) <Qty>           5
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          4693
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000018
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   13
+   LeavesQty (151) <Qty>                6
+   CumQty (14) <Qty>                    213
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               235
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              313
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              20
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.379
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          ORTA
+      ContraTrader (337) <String>          6208
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          NYVY
+      ContraTrader (337) <String>          6919
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          4035
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000019
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   4
+   LeavesQty (151) <Qty>                2
+   CumQty (14) <Qty>                    217
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               163
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              289
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              21
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:24.379
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000003
+   ClOrdID (11) <String>                C2022031700000003
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          NXPR
+      ContraTrader (337) <String>          2384
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          ORTA
+      ContraTrader (337) <String>          1368
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000020
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                Filled (2)
+   Symbol (55) <String> [Instrument]    NYSE:WMT
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   219
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   142.521
+   TimeInForce (59) <char>              ImmediateOrCancel (3)
+   LastQty (32) <Qty>                   2
+   LeavesQty (151) <Qty>                0
+   CumQty (14) <Qty>                    219
+   AvgPx (6) <Price>                    142.521
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:24.369
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               220
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              152
+   MsgType (35) <String>                NewOrderSingle (D)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              5
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.219
+NewOrderSingle (D)
+   ClOrdID (11) <String>                C2022031700000004
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+trailer
+   CheckSum (10) <String>               169
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              228
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              22
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.221
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   ExecID (17) <String>                 E2022031700000021
+   ExecType (150) <char>                New (0)
+   OrdStatus (39) <char>                New (0)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastCapacity (29) <char>             Principal (4)
+   LeavesQty (151) <Qty>                181
+   CumQty (14) <Qty>                    0
+   AvgPx (6) <Price>                    0
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               117
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              363
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              23
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.223
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 5
+   NoContraBrokers (Repeating group 1/5)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          4585
+      ContraTradeQty (437) <Qty>           18
+   NoContraBrokers (Repeating group 2/5)
+      ContraBroker (375) <String>          NXPR
+      ContraTrader (337) <String>          4395
+      ContraTradeQty (437) <Qty>           22
+   NoContraBrokers (Repeating group 3/5)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          8422
+      ContraTradeQty (437) <Qty>           5
+   NoContraBrokers (Repeating group 4/5)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          2470
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 5/5)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          3107
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000022
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   47
+   LeavesQty (151) <Qty>                134
+   CumQty (14) <Qty>                    47
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               156
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              314
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              24
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.226
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          7245
+      ContraTradeQty (437) <Qty>           40
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          6771
+      ContraTradeQty (437) <Qty>           5
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          STANS
+      ContraTrader (337) <String>          5152
+      ContraTradeQty (437) <Qty>           7
+   ExecID (17) <String>                 F2022031700000023
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   52
+   LeavesQty (151) <Qty>                82
+   CumQty (14) <Qty>                    99
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               206
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              290
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              25
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.227
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          1147
+      ContraTradeQty (437) <Qty>           20
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          9155
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000024
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   21
+   LeavesQty (151) <Qty>                61
+   CumQty (14) <Qty>                    120
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               147
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              314
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              26
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.227
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          AVR2
+      ContraTrader (337) <String>          7316
+      ContraTradeQty (437) <Qty>           9
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          HULZ
+      ContraTrader (337) <String>          7862
+      ContraTradeQty (437) <Qty>           15
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          NYVY
+      ContraTrader (337) <String>          7543
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000025
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   25
+   LeavesQty (151) <Qty>                36
+   CumQty (14) <Qty>                    145
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               201
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              339
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              27
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.228
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 4
+   NoContraBrokers (Repeating group 1/4)
+      ContraBroker (375) <String>          AVR1
+      ContraTrader (337) <String>          7003
+      ContraTradeQty (437) <Qty>           17
+   NoContraBrokers (Repeating group 2/4)
+      ContraBroker (375) <String>          AVR1
+      ContraTrader (337) <String>          2920
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 3/4)
+      ContraBroker (375) <String>          ORTA
+      ContraTrader (337) <String>          6564
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 4/4)
+      ContraBroker (375) <String>          STANS
+      ContraTrader (337) <String>          2545
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000026
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   21
+   LeavesQty (151) <Qty>                15
+   CumQty (14) <Qty>                    166
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               144
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              311
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              28
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.229
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 3
+   NoContraBrokers (Repeating group 1/3)
+      ContraBroker (375) <String>          SIMM
+      ContraTrader (337) <String>          9344
+      ContraTradeQty (437) <Qty>           5
+   NoContraBrokers (Repeating group 2/3)
+      ContraBroker (375) <String>          HULV
+      ContraTrader (337) <String>          9564
+      ContraTradeQty (437) <Qty>           1
+   NoContraBrokers (Repeating group 3/3)
+      ContraBroker (375) <String>          ORTA
+      ContraTrader (337) <String>          1366
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000027
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   7
+   LeavesQty (151) <Qty>                8
+   CumQty (14) <Qty>                    173
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               043
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              287
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              29
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.230
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 2
+   NoContraBrokers (Repeating group 1/2)
+      ContraBroker (375) <String>          CAMS
+      ContraTrader (337) <String>          2558
+      ContraTradeQty (437) <Qty>           2
+   NoContraBrokers (Repeating group 2/2)
+      ContraBroker (375) <String>          HULZ
+      ContraTrader (337) <String>          9039
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000028
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   3
+   LeavesQty (151) <Qty>                5
+   CumQty (14) <Qty>                    176
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               077
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              263
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              30
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.231
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 1
+   NoContraBrokers (Repeating group 1/1)
+      ContraBroker (375) <String>          KLMR
+      ContraTrader (337) <String>          2559
+      ContraTradeQty (437) <Qty>           4
+   ExecID (17) <String>                 F2022031700000029
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                PartiallyFilled (1)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   4
+   LeavesQty (151) <Qty>                1
+   CumQty (14) <Qty>                    180
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               112
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              263
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              31
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:26.232
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000004
+   ClOrdID (11) <String>                C2022031700000004
+   NoContraBrokers (382) <NumInGroup> [ContraGrp] 1
+   NoContraBrokers (Repeating group 1/1)
+      ContraBroker (375) <String>          BRTS
+      ContraTrader (337) <String>          5679
+      ContraTradeQty (437) <Qty>           1
+   ExecID (17) <String>                 F2022031700000030
+   ExecType (150) <char>                Trade (F)
+   OrdStatus (39) <char>                Filled (2)
+   Symbol (55) <String> [Instrument]    NYSE:BAC
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   181
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   40.818
+   TimeInForce (59) <char>              GoodTillCrossing (5)
+   LastQty (32) <Qty>                   1
+   LeavesQty (151) <Qty>                0
+   CumQty (14) <Qty>                    181
+   AvgPx (6) <Price>                    40.818
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:26.219
+   HandlInst (21) <char>                AutomatedExecutionInterventionOK (2)
+trailer
+   CheckSum (10) <String>               112
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              151
+   MsgType (35) <String>                NewOrderSingle (D)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              6
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:27.455
+NewOrderSingle (D)
+   ClOrdID (11) <String>                C2022031700000005
+   HandlInst (21) <char>                ManualOrder (3)
+   Symbol (55) <String> [Instrument]    NYSE:UNH
+   Side (54) <char>                     Sell (2)
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:27.455
+   OrderQty (38) <Qty> [OrderQtyData]   3
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   498.602
+   TimeInForce (59) <char>              AtTheClose (7)
+trailer
+   CheckSum (10) <String>               169
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              232
+   MsgType (35) <String>                ExecutionReport (8)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              32
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:27.457
+ExecutionReport (8)
+   OrderID (37) <String>                O2022031700000005
+   ClOrdID (11) <String>                C2022031700000005
+   ExecID (17) <String>                 E2022031700000031
+   ExecType (150) <char>                Rejected (8)
+   OrdStatus (39) <char>                Rejected (8)
+   OrdRejReason (103) <int>             IncorrectAllocatedQuantity (14)
+   Symbol (55) <String> [Instrument]    NYSE:UNH
+   Side (54) <char>                     Sell (2)
+   OrderQty (38) <Qty> [OrderQtyData]   3
+   OrdType (40) <char>                  Limit (2)
+   Price (44) <Price>                   498.602
+   TimeInForce (59) <char>              AtTheClose (7)
+   LastCapacity (29) <char>             Principal (4)
+   LeavesQty (151) <Qty>                0
+   CumQty (14) <Qty>                    0
+   AvgPx (6) <Price>                    0
+   TransactTime (60) <UTCTimestamp>     20220316-21:33:27.455
+   HandlInst (21) <char>                ManualOrder (3)
+trailer
+   CheckSum (10) <String>               089
+---------------------- Recv ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              80
+   MsgType (35) <String>                Logout (5)
+   SenderCompID (49) <String>           CLI_SRV
+   TargetCompID (56) <String>           SRV_CLI
+   MsgSeqNum (34) <SeqNum>              7
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:29.328
+Logout (5)
+   Text (58) <String>                   goodbye from client
+trailer
+   CheckSum (10) <String>               075
+continuous => logoff_received
+---------------------- Sent ----------------------
+header
+   BeginString (8) <String>             FIX.4.4
+   BodyLength (9) <Length>              85
+   MsgType (35) <String>                Logout (5)
+   SenderCompID (49) <String>           SRV_CLI
+   TargetCompID (56) <String>           CLI_SRV
+   MsgSeqNum (34) <SeqNum>              33
+   SendingTime (52) <UTCTimestamp>      20220316-21:33:29.330
+Logout (5)
+   Text (58) <String>                   remote initiated logout
+trailer
+   CheckSum (10) <String>               061
+logoff_received => logoff_sent_and_received
+logoff_sent_and_received => session_terminated
+Client session(1) finished. Waiting for new connection (q=quit)...
 %
 ```
 
 </p>
 </details>
 
-### Screenshot server
+### Screenshots (server)
 
 <details><summary><i>expand</i></summary>
-<i>Shows the server responding to a logout, send a logoff response, and then awaiting a new connection. Notice the state changes.</i>
+<i>Shows the server responding to a NewOrderSingle by sending an ExecutionReport.</i>
 <p>
 
-![Shows the server responding to a logout out](assets/server_screenshot.png)
+![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
+
+</p>
+</details>
+
+<details><summary><i>expand</i></summary>
+<i>Shows the server sending and receiving messages (summary mode).</i>
+<p>
+
+![Shows the server sending and receiving messages](assets/example_server_summary.png)
 
 </p>
 </details>
@@ -644,502 +1569,107 @@ terminated.
 ### Output client
 
 <details><summary><i>expand</i></summary>
+<i>Shows the client logging in, sending NewOrderSingles and receiving ExecutionReports. Summary mode was selected.</i>
 <p>
 
 ```bash
-% ./simpleclisrv -c ../config/simple_client.xml
-loaded: libFIX42d.so
+% ./simpleclisrv -c ../config/simple_client.xml -u
+loaded: libFIX44_EXAMPLEd.so
 starting reliable client
-Press 'l' to logout and quit, 'q' to quit (no logout), 'x' to just exit
-none => not_logged_in (../runtime/session.cpp:286)
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     69
-   MsgType (35)                       Logon (A)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     1
-   SendingTime (52)                   20211210-05:08:18.993
-Logon ("A")
-   EncryptMethod (98)                 0
-   HeartBtInt (108)                   10
-trailer ("trailer")
-   CheckSum (10)                      105
-not_logged_in => logon_sent (../runtime/session.cpp:308)
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     69
-   MsgType (35)                       Logon (A)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     1
-   SendingTime (52)                   20211210-05:08:18.999
-Logon ("A")
-   EncryptMethod (98)                 None (0)
-   HeartBtInt (108)                   10
-trailer ("trailer")
-   CheckSum (10)                      111
-logon_sent => logon_received (../runtime/session.cpp:735)
-logon_received => continuous (../runtime/session.cpp:809)
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     2
-   SendingTime (52)                   20211210-05:08:23.992
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord1
-   HandlInst (21)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          1
-   TransactTime (60)                  20211210-05:08:23.991
-   OrderQty (38)                      25
-   OrdType (40)                       2
-   Price (44)                         119.635
-   TimeInForce (59)                   4
-trailer ("trailer")
-   CheckSum (10)                      012
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     2
-   SendingTime (52)                   20211210-05:08:23.993
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec1
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     New (0)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  Principal (4)
-   LeavesQty (151)                    25
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      172
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     3
-   SendingTime (52)                   20211210-05:08:24.006
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec2
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     PartiallyFilled (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    21
-   LeavesQty (151)                    4
-   CumQty (14)                        21
-   AvgPx (6)                          119.63
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      210
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     198
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     4
-   SendingTime (52)                   20211210-05:08:24.007
-ExecutionReport ("8")
-   OrderID (37)                       ord1
-   ClOrdID (11)                       ord1
-   ExecID (17)                        exec3
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     Filled (2)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Buy (1)
-   OrderQty (38)                      25
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.63
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    4
-   LeavesQty (151)                    0
-   CumQty (14)                        25
-   AvgPx (6)                          119.63
-   TransactTime (60)                  20211210-05:08:23.991
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      166
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     3
-   SendingTime (52)                   20211210-05:08:29.008
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord2
-   HandlInst (21)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          2
-   TransactTime (60)                  20211210-05:08:29.008
-   OrderQty (38)                      14
-   OrdType (40)                       2
-   Price (44)                         119.944
-   TimeInForce (59)                   4
-trailer ("trailer")
-   CheckSum (10)                      005
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     5
-   SendingTime (52)                   20211210-05:08:29.010
-ExecutionReport ("8")
-   OrderID (37)                       ord2
-   ClOrdID (11)                       ord2
-   ExecID (17)                        exec4
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     New (0)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      14
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.94
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  Principal (4)
-   LeavesQty (151)                    14
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:29.008
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      162
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     6
-   SendingTime (52)                   20211210-05:08:29.023
-ExecutionReport ("8")
-   OrderID (37)                       ord2
-   ClOrdID (11)                       ord2
-   ExecID (17)                        exec5
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     Filled (2)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      14
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.94
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    14
-   LeavesQty (151)                    0
-   CumQty (14)                        14
-   AvgPx (6)                          119.94
-   TransactTime (60)                  20211210-05:08:29.008
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      225
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     4
-   SendingTime (52)                   20211210-05:08:34.028
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord3
-   HandlInst (21)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          2
-   TransactTime (60)                  20211210-05:08:34.028
-   OrderQty (38)                      20
-   OrdType (40)                       2
-   Price (44)                         119.706
-   TimeInForce (59)                   4
-trailer ("trailer")
-   CheckSum (10)                      252
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     7
-   SendingTime (52)                   20211210-05:08:34.029
-ExecutionReport ("8")
-   OrderID (37)                       ord3
-   ClOrdID (11)                       ord3
-   ExecID (17)                        exec6
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     New (0)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      20
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.71
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  Principal (4)
-   LeavesQty (151)                    20
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:34.028
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      161
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     199
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     8
-   SendingTime (52)                   20211210-05:08:34.030
-ExecutionReport ("8")
-   OrderID (37)                       ord3
-   ClOrdID (11)                       ord3
-   ExecID (17)                        exec7
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     Filled (2)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      20
-   OrdType (40)                       Limit (2)
-   Price (44)                         119.71
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    20
-   LeavesQty (151)                    0
-   CumQty (14)                        20
-   AvgPx (6)                          119.71
-   TransactTime (60)                  20211210-05:08:34.028
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      204
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     140
-   MsgType (35)                       NewOrderSingle (D)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     5
-   SendingTime (52)                   20211210-05:08:39.033
-NewOrderSingle ("D")
-   ClOrdID (11)                       ord4
-   HandlInst (21)                     1
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          2
-   TransactTime (60)                  20211210-05:08:39.033
-   OrderQty (38)                      21
-   OrdType (40)                       2
-   Price (44)                         120.451
-   TimeInForce (59)                   4
-trailer ("trailer")
-   CheckSum (10)                      246
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     193
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     9
-   SendingTime (52)                   20211210-05:08:39.034
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec8
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     New (0)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastCapacity (29)                  Principal (4)
-   LeavesQty (151)                    21
-   CumQty (14)                        0
-   AvgPx (6)                          0
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      164
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     10
-   SendingTime (52)                   20211210-05:08:39.048
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec9
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     PartiallyFilled (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    18
-   LeavesQty (151)                    3
-   CumQty (14)                        18
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      250
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     11
-   SendingTime (52)                   20211210-05:08:39.049
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec10
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     PartiallyFilled (1)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    2
-   LeavesQty (151)                    1
-   CumQty (14)                        20
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      228
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     200
-   MsgType (35)                       ExecutionReport (8)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     12
-   SendingTime (52)                   20211210-05:08:39.050
-ExecutionReport ("8")
-   OrderID (37)                       ord4
-   ClOrdID (11)                       ord4
-   ExecID (17)                        exec11
-   ExecTransType (20)                 New (0)
-   ExecType (150)                     New (0)
-   OrdStatus (39)                     Filled (2)
-   Symbol (55)                        NYSE::IBM
-   Side (54)                          Sell (2)
-   OrderQty (38)                      21
-   OrdType (40)                       Limit (2)
-   Price (44)                         120.45
-   TimeInForce (59)                   FillOrKill (4)
-   LastShares (32)                    1
-   LeavesQty (151)                    0
-   CumQty (14)                        21
-   AvgPx (6)                          120.45
-   TransactTime (60)                  20211210-05:08:39.033
-   HandlInst (21)                     AutomatedExecutionNoIntervention (1)
-trailer ("trailer")
-   CheckSum (10)                      222
-l
----------------------- sent ----------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     68
-   MsgType (35)                       Logout (5)
-   SenderCompID (49)                  CLI_SRV
-   TargetCompID (56)                  SRV_CLI
-   MsgSeqNum (34)                     6
-   SendingTime (52)                   20211210-05:08:40.565
-Logout ("5")
-   Text (58)                          goodbye
-trailer ("trailer")
-   CheckSum (10)                      212
-continuous => logoff_sent (../runtime/session.cpp:1076)
--------------------- received --------------------
-header ("header")
-   BeginString (8)                    FIX.4.2
-   BodyLength (9)                     85
-   MsgType (35)                       Logout (5)
-   SenderCompID (49)                  SRV_CLI
-   TargetCompID (56)                  CLI_SRV
-   MsgSeqNum (34)                     13
-   SendingTime (52)                   20211210-05:08:40.566
-Logout ("5")
-   Text (58)                          remote initiated logout
-trailer ("trailer")
-   CheckSum (10)                      058
-logoff_sent => logoff_received (../runtime/session.cpp:1063)
-logoff_received => session_terminated (../runtime/session.cpp:358)
+none => starting
+starting => attempting (1) attempt(s)
+attempting => connected
+   none => not_logged_in
+Sent 2022-03-17 08:33:19.747446966 Logon           (A) seq=1
+   not_logged_in => logon_sent
+Recv 2022-03-17 08:33:19.756000000 Logon           (A) seq=1
+   logon_sent => logon_received
+   logon_received => continuous
+Sent 2022-03-17 08:33:22.247519268 NewOrderSingle  (D) seq=2      NASDAQ:FB    S 9 @ 200.14
+Recv 2022-03-17 08:33:22.250000000 ExecutionReport (8) seq=2      NASDAQ:FB    S 9 @ 200.14 New
+Recv 2022-03-17 08:33:22.252000000 ExecutionReport (8) seq=3      NASDAQ:FB    S 4 @ 200.14 PartiallyFilled
+Recv 2022-03-17 08:33:22.253000000 ExecutionReport (8) seq=4      NASDAQ:FB    S 2 @ 200.14 PartiallyFilled
+Recv 2022-03-17 08:33:22.254000000 ExecutionReport (8) seq=5      NASDAQ:FB    S 2 @ 200.14 PartiallyFilled
+Recv 2022-03-17 08:33:22.255000000 ExecutionReport (8) seq=6      NASDAQ:FB    S 1 @ 200.14 Filled
+Sent 2022-03-17 08:33:23.716449040 NewOrderSingle  (D) seq=3      NYSE:XOM     S 82 @ 83.3974
+Recv 2022-03-17 08:33:23.718000000 ExecutionReport (8) seq=7      NYSE:XOM     S 82 @ 83.397 New
+Recv 2022-03-17 08:33:23.721000000 ExecutionReport (8) seq=8      NYSE:XOM     S 30 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.722000000 ExecutionReport (8) seq=9      NYSE:XOM     S 24 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.724000000 ExecutionReport (8) seq=10     NYSE:XOM     S 16 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.725000000 ExecutionReport (8) seq=11     NYSE:XOM     S 6 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.726000000 ExecutionReport (8) seq=12     NYSE:XOM     S 2 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.727000000 ExecutionReport (8) seq=13     NYSE:XOM     S 2 @ 83.397 PartiallyFilled
+Recv 2022-03-17 08:33:23.728000000 ExecutionReport (8) seq=14     NYSE:XOM     S 2 @ 83.397 Filled
+Sent 2022-03-17 08:33:24.369535580 NewOrderSingle  (D) seq=4      NYSE:WMT     S 219 @ 142.521
+Recv 2022-03-17 08:33:24.371000000 ExecutionReport (8) seq=15     NYSE:WMT     S 219 @ 142.521 New
+Recv 2022-03-17 08:33:24.374000000 ExecutionReport (8) seq=16     NYSE:WMT     S 184 @ 142.521 PartiallyFilled
+Recv 2022-03-17 08:33:24.376000000 ExecutionReport (8) seq=17     NYSE:WMT     S 11 @ 142.521 PartiallyFilled
+Recv 2022-03-17 08:33:24.377000000 ExecutionReport (8) seq=18     NYSE:WMT     S 5 @ 142.521 PartiallyFilled
+Recv 2022-03-17 08:33:24.378000000 ExecutionReport (8) seq=19     NYSE:WMT     S 13 @ 142.521 PartiallyFilled
+Recv 2022-03-17 08:33:24.379000000 ExecutionReport (8) seq=20     NYSE:WMT     S 4 @ 142.521 PartiallyFilled
+Recv 2022-03-17 08:33:24.379000000 ExecutionReport (8) seq=21     NYSE:WMT     S 2 @ 142.521 Filled
+Sent 2022-03-17 08:33:26.219801667 NewOrderSingle  (D) seq=5      NYSE:BAC     S 181 @ 40.8182
+Recv 2022-03-17 08:33:26.221000000 ExecutionReport (8) seq=22     NYSE:BAC     S 181 @ 40.818 New
+Recv 2022-03-17 08:33:26.223000000 ExecutionReport (8) seq=23     NYSE:BAC     S 47 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.226000000 ExecutionReport (8) seq=24     NYSE:BAC     S 52 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.227000000 ExecutionReport (8) seq=25     NYSE:BAC     S 21 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.227000000 ExecutionReport (8) seq=26     NYSE:BAC     S 25 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.228000000 ExecutionReport (8) seq=27     NYSE:BAC     S 21 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.229000000 ExecutionReport (8) seq=28     NYSE:BAC     S 7 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.230000000 ExecutionReport (8) seq=29     NYSE:BAC     S 3 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.231000000 ExecutionReport (8) seq=30     NYSE:BAC     S 4 @ 40.818 PartiallyFilled
+Recv 2022-03-17 08:33:26.232000000 ExecutionReport (8) seq=31     NYSE:BAC     S 1 @ 40.818 Filled
+Sent 2022-03-17 08:33:27.455449427 NewOrderSingle  (D) seq=6      NYSE:UNH     S 3 @ 498.602
+Recv 2022-03-17 08:33:27.457000000 ExecutionReport (8) seq=32     NYSE:UNH     S 3 @ 498.602 Rejected
+Sent 2022-03-17 08:33:29.328844266 Logout          (5) seq=7
+   continuous => logoff_sent
+Recv 2022-03-17 08:33:29.330000000 Logout          (5) seq=33
+   logoff_sent => logoff_received
+   logoff_received => session_terminated
+ => stopping
 %
 ```
 
 </p>
 </details>
 
-### Screenshot client
+### Screenshots (client)
 
 <details><summary><i>expand</i></summary>
-<i>Shows the client sending a logout, and the response from the server. Notice the state changes.</i>
+<i>Shows the client receiving an ExecutionReport (verbose mode).</i>
 <p>
 
-![Shows the client logging out](assets/client_screenshot.png)
+![Shows the client receiving an ExecutionReport](assets/example_client_detail.png)
 
 </p>
 </details>
+
+<details><summary><i>expand</i></summary>
+<i>Shows the client sending and receiving messages (summary mode).</i>
+<p>
+
+![Shows the client sending and receiving messages](assets/example_client_summary.png)
+
+</p>
+</details>
+
+<details><summary><i>expand</i></summary>
+<i>Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting. Notice the state changes.</i>
+<p>
+
+![Shows a reliable client attempting to reconnect, finally performing an automatic sequence reset and successfully connecting](assets/example_client_reliable.png)
+
+</p>
+</details>
+
+### Screenshots (misc)
+
+<details><summary><i>expand</i></summary>
+<i>Using thread naming and filtering with htop, showing client and server threads.</i>
+<p>
+
+![Thread naming and filtering](assets/example_htop.png)
+
+</p>
+</details>
+
