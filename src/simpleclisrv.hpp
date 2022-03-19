@@ -46,6 +46,11 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #define FIX8PRO_SIMPLECLISRV_HPP_
 
 //-----------------------------------------------------------------------------------------
+#if defined FIX8PRO_MAGIC_NUM && FIX8PRO_MAGIC_NUM < 220300L
+#error Fix8Pro version 22.03 or greater required to biuld this application.
+#endif
+
+//-----------------------------------------------------------------------------------------
 #include <FIX44_EXAMPLE_types.hpp>
 #include <FIX44_EXAMPLE_router.hpp>
 #include <FIX44_EXAMPLE_classes.hpp>
@@ -64,6 +69,8 @@ class Application final : public Fix8ProApplication
 	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password, _capfile;
 	unsigned _next_send, _next_receive;
 	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
+	std::unique_ptr<std::ostream> _ofptr;
+	std::unique_ptr<std::ostream, f8_deleter> _cofs;
 
 	int main(const std::vector<f8String>& args) override; // required
 	bool options_setup(cxxopts::Options& ops) override;
@@ -71,6 +78,8 @@ class Application final : public Fix8ProApplication
 	void server_session(SessionInstanceBase_ptr inst, int scnt);
 	void client_session(ClientSessionBase_ptr mc);
 	MessagePtr generate_order();
+	bool setup_capture();
+	std::ostream& cout() const { return *_cofs.get(); }
 
 public:
 	using Fix8ProApplication::Fix8ProApplication;
@@ -84,7 +93,7 @@ public:
 /// Note: inheriting from the compiler generated router requires passing the -U flag to the fix8pro compiler f8pc (see CMakeLists.txt)
 class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 {
-	Application& _app { Application::get_instance<Application>() };
+	Application& _app { Fix8ProApplication::get_instance<Application>() };
 
 	// ExecutionReport handler (client)
 	bool operator()(const ExecutionReport *msg) override;
@@ -146,7 +155,7 @@ class teebuf : public std::streambuf // courtesy Nicolai M. Josuttis
 	// Sync both teed buffers.
 	virtual int sync() override
 	{
-		const int r1 { _sb1->pubsync() }, r2 { _sb2->pubsync() };
+		const int r1 = _sb1->pubsync(), r2 = _sb2->pubsync();
 		return r1 == 0 && r2 == 0 ? 0 : -1;
 	}
 
@@ -156,7 +165,7 @@ class teebuf : public std::streambuf // courtesy Nicolai M. Josuttis
 	{
 		if (c == EOF)
 			return !EOF;
-		const int r1 { _sb1->sputc(c) }, r2 { _sb2->sputc(c) };
+		const int r1 = _sb1->sputc(c), r2 = _sb2->sputc(c);
 		return r1 == EOF || r2 == EOF ? EOF : c;
 	}
 
@@ -170,15 +179,15 @@ public:
 };
 
 //-----------------------------------------------------------------------------------------
-class filtercolourteebuf : public teebuf // filters escape sequences
+class filtercolourteebuf : public teebuf // filters colour escape sequences
 {
 	bool ison{};
-	virtual int overflow(int c) override
+	int overflow(int c) override
 	{
 		if (c == EOF)
 			return !EOF;
-		const int r1 { _sb1->sputc(c) };
-		int r2{};
+		const int r1 = _sb1->sputc(c);
+		int r2 = 0;
 		if (ison)
 		{
 			if ((c & 0xff) == 'm')
@@ -192,19 +201,16 @@ class filtercolourteebuf : public teebuf // filters escape sequences
 	}
 
 public:
-	// Construct a streambuf which tees output to both input
-	// streambufs.
 	filtercolourteebuf(std::streambuf *sb1, std::streambuf *sb2) : teebuf(sb1, sb2) {}
 };
 
 //-----------------------------------------------------------------------------------------
+template<typename T>
 class teestream : public std::ostream
 {
-	filtercolourteebuf tbuf;
+	T tbuf;
 
 public:
-// Construct an ostream which tees output to the supplied
-// ostreams.
 	teestream(std::ostream& o1, std::ostream& o2)
 		: std::ostream(&tbuf), tbuf(o1.rdbuf(), o2.rdbuf()) {}
 };
