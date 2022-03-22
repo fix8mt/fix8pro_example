@@ -29,6 +29,10 @@ This brief example demonstrates how to create a client and a server that can lis
 
 This example uses the standard FIX44 dictionary. It also uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
 
+<kbd> ![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
+  <p><i>Message displayed with the built-in Fix8Pro printer</i></p>
+</kbd>
+
 ## To download
 There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version) and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge). Optionally specify the `dev` branch when you clone:
 ```bash
