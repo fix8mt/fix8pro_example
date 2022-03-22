@@ -10,8 +10,8 @@
 3.   [Before you build](#before-you-build)
 4.   [To build](#to-build)
 5.   [To setup your run environment](#to-setup-your-run-environment)
-6.   [To run](#to-run)
-7.   [CLI options](#cli-options)
+6.   [CLI options](#cli-options)
+7.   [To run](#to-run)
 8.   [Sample output](#sample-output)
       1.   [Server](#server)
       1.   [Client](#client)
@@ -44,7 +44,7 @@ cd fix8pro_example
 You will need the following to build this example:
 1. A supported C++17 compiler and build environment
 1. A Fix8Pro license from Fix8MT (or an evaluation license)
-1. An installed Fix8Pro binary package
+1. An installed Fix8Pro binary package, minimum version **22.03**
 
 ## To build
 For example assuming you have installed Fix8Pro to `/opt/fix8pro` and your license file is also in `/opt/fix8pro`:
@@ -67,19 +67,6 @@ For example, if your license file is in `/opt/fix8pro`:
 ```bash
 export FIX8PRO_LICENSE_FILE=/opt/fix8pro/mylic.xml
 ```
-
-## To run
-This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the `./build` directory.
-In one terminal we'll run our server:
-```bash
-./simpleclisrv -c ../config/simple_server.xml -s
-```
-In our other terminal we'll run our client:
-```bash
-./simpleclisrv -c ../config/simple_client.xml
-```
-- When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
-- From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
 ## CLI options
 
@@ -156,6 +143,19 @@ cli/srv pair with supplied hash pw, random generation interval (~1s), base threa
 
 </p>
 </details>
+
+## To run
+This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the `./build` directory.
+In one terminal we'll run our server:
+```bash
+./simpleclisrv -c ../config/simple_server.xml -s
+```
+In our other terminal we'll run our client:
+```bash
+./simpleclisrv -c ../config/simple_client.xml
+```
+- When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
+- From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
 ## Sample output
 
