@@ -34,7 +34,9 @@ This example uses the standard FIX44 dictionary. It also uses high quality pseud
 </kbd>
 
 ## To download
-There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version) and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge). Optionally specify the `dev` branch when you clone:
+You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases). There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version) and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge).
+
+Optionally specify the `dev` branch when you clone:
 ```bash
 git clone https://github.com/fix8mt/fix8pro_example.git [-b dev]
 cd fix8pro_example
@@ -42,8 +44,8 @@ cd fix8pro_example
 
 ## Before you build
 You will need the following to build this example:
-1. A supported C++17 compiler and build environment
-1. A Fix8Pro license from Fix8MT (or an evaluation license)
+1. A supported [`C++17`](https://en.wikipedia.org/wiki/C%2B%2B17) compiler and build environment
+1. A Fix8Pro license from [`Fix8MT`](https://fix8mt.com/) (or an evaluation license)
 1. An installed Fix8Pro binary package, minimum version **22.03**
 
 ## To build
