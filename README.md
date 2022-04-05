@@ -13,9 +13,10 @@
 6.   [CLI options](#cli-options)
 7.   [To run](#to-run)
 8.   [Order Mode](#order-mode)
-9.   [Market Data Mode](#marketdata-mode)
-10.  [Runtime Interaction](#runtime-interaction)
-11.  [Sample output](#sample-output)
+9.   [Market Data Mode](#market-data-mode)
+10.  [About the random numbers and distributions used](#about-the-random-numbers-and-distributions-used)
+11.  [Runtime Interaction](#runtime-interaction)
+12.  [Sample output](#sample-output)
       1.   [Server](#server)
       1.   [Client](#client)
       1.   [Misc](#misc)
@@ -162,7 +163,10 @@ cli/srv pair running in market data mode, load refdata from file, random generat
 
 ## To run
 This example has been designed to run as two instances - a client and a server. For simplicity we'll run the test from the `./build` directory.
-By default, the application runs in 'order mode'.  In one terminal we'll run our server:
+By default, the application runs in 'order mode'.
+
+### Run in Order Mode
+In one terminal we'll run our server:
 ```bash
 ./simpleclisrv -c ../config/simple_server.xml -s
 ```
@@ -173,7 +177,7 @@ In our other terminal we'll run our client:
 - When connected, the client will send a `NewOrderSingle` every 5 seconds. The server will simulate an order accept and trade, sending back an acknowledgment followed by a random number of fills (`ExecutionReport`s).
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
-To run in 'market data mode':
+### Run in Market Data Mode
 ```bash
 ./simpleclisrv -c ../config/simple_server.xml -s -m
 ```
@@ -187,12 +191,11 @@ which will show incremental changes to a simulated order book, top of book and f
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
 ## Order Mode
-This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol. The symbol set is
-hard coded in the application (edit to suit your purposes). The static `Instrument` table is show below. The values for each symbol are a reference price and the maximum quantity that can be ordered:
+This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol. The default symbol set is hard coded in the application (the static `Instrument` table is show below). The values for each symbol are a reference price and the maximum quantity that can be ordered:
 ```cpp
 const Instruments SimpleSession::_staticdata
 {
-	{ "AAPL:NASDAQ",  { 163.17,   50 } },  { "MSFT:NASDAQ",  { 289.86,   50 } },
+   { "AAPL:NASDAQ",  { 163.17,   50 } },  { "MSFT:NASDAQ",  { 289.86,   50 } },
    { "GOOG:NASDAQ",  { 2642.44,  100 } }, { "AMZN:NASDAQ",  { 2912.82,  100 } },
    { "TSLA:NASDAQ",  { 838.29,   120 } }, { "MMM:NYSE",     { 149.5,    120 } },
    { "FB:NASDAQ",    { 200.06,   120 } }, { "NVDA:NASDAQ",  { 229.36,   120 } },
@@ -205,7 +208,7 @@ const Instruments SimpleSession::_staticdata
 };
 ```
 You can supply your own list of securities in CSV format. A sample 100 US stocks is provided in the file `config/sample_ref_data.csv`, sample shown here:
-```bash
+```
 # security, refprice, max order qty
 AAPL:NASDAQ,   163.17,  50
 MSFT:NASDAQ,   289.86,  50
@@ -249,8 +252,9 @@ The server receives the order and responds using the following method:
 1. Each fill is also randomly assigned 1 to 12 `ContraBroker`s with a randomly chosen sub-quantity and `ContraTrader` ID in repeating groups
 
 ## Market Data Mode
-This mode simulates a market data service. After the client logs in and establishes a normal session, it will request a list of securities, subscribe to some and then receive
-market data updates continually from the server. This process is described below:
+This mode simulates a market data service. After the client logs in and establishes a normal session, it will request a list of securities, subscribe to some and then receive market data updates continually from the server. The market data generated in this mode is not the same data generated in order mode.
+
+This process is described below:
 
 The client subscribes as follows:
 1. At startup or if resubscribe is triggered, the client sends a `SecurityListRequest`;
@@ -281,7 +285,7 @@ removed when no quantity or order count remains
 1. A 'daily' record is maintained for each security which contains Open, High, Low, Close, Last/Volume, Total Volume and Total Price Volume (TPV)
 1. VWAP and Imbalance are calculated when a `MarketDataSnapshotFullRefresh` TOB is sent using the TPV and best bid/offer quantities
 
-### About the random numbers and distributions used
+## About the random numbers and distributions used
 We are using the following:
 1. A Mersenne twister engine (mt19937) seeded using the `std::random_device` (the seed token is overrideable)
 1. `std::uniform_int_distribution` is used to select random integers from a range
