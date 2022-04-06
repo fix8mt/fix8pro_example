@@ -14,6 +14,7 @@
 1.   [To run](#to-run)
       1. [Run in Order Mode](#run-in-order-mode)
       1. [Run in Market Data Mode](#run-in-market-data-mode)
+1.   [Securities](#securities)
 1.   [Order Mode](#order-mode)
 1.   [Market Data Mode](#market-data-mode)
       1. [About the orderbook and matching](#about-the-orderbook-and-matching)
@@ -46,7 +47,7 @@ on our [github repo](https://github.com/fix8mt/ufeed_bindings).
 This example demonstrates how to create a client and a server that can accept or initiate FIX sessions. A client or server can run in two modes -
 as an execution gateway processing orders and sending execution reports; and as a market data server, accepting market data subscriptions, sending full refreshes and incremental updates. These modes are discussed in detail below.
 
-This example uses the standard FIX44 dictionary and uses high quality pseudo-random number generation classes provided by the C++ Standard Library, offering a model for creating simulations.
+This example uses the standard FIX44 dictionary, uses high quality pseudo-random number generation classes provided by the C++ Standard Library and offers a model for creating trading simulations.
 
 <kbd> ![Shows the server responding to a NewOrderSingle](assets/example_server_detail.png)
   <p><i>Message displayed with the built-in Fix8Pro printer</i></p>
@@ -66,7 +67,7 @@ cd fix8pro_example
 You will need the following to build this example:
 1. A supported [`C++17`](https://en.wikipedia.org/wiki/C%2B%2B17) compiler and build environment
 1. A Fix8Pro license from [`Fix8MT`](https://fix8mt.com/) (or an evaluation license)
-1. An installed Fix8Pro binary package, minimum version **22.03**
+1. An installed Fix8Pro binary [package](https://www.fix8mt.com/releases), minimum version **22.03**
 
 ## To build
 For example assuming you have installed Fix8Pro to `/opt/fix8pro` and your license file is also in `/opt/fix8pro`:
@@ -204,8 +205,8 @@ select a sub-set of those securities and send `MarketDataRequest` messages subsc
 which will show incremental changes to a simulated order book, top of book and full market depth.
 - From the client, press `l<enter>` to logout and shutdown, `q<enter>` to shutdown and `x<enter>` to just exit
 
-## Order Mode
-This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol. The default symbol set is hard coded in the application (the static `Instrument` table is show below). The values for each symbol are a reference price and the maximum quantity that can be ordered:
+## Securities
+The default set of secutities used in both order and market data modes are hard coded in the application (the static `Instrument` table is show below). The values for each symbol are a reference price and the maximum quantity that can be ordered:
 ```cpp
 const Instruments SimpleSession::_staticdata
 {
@@ -221,7 +222,7 @@ const Instruments SimpleSession::_staticdata
    { "CVX:NYSE",     { 158.65,   200 } }, { "PFE:NYSE",     { 48.65,    200 } },
 };
 ```
-You can supply your own list of securities in CSV format. A sample 100 US stocks is provided in the file `config/sample_ref_data.csv`, sample shown here:
+You can supply your own list of securities in CSV format (see `-f` option). A sample 100 US stocks is provided in the file `config/sample_ref_data.csv`, a sample is shown here:
 ```
 # security, refprice, max order qty
 AAPL:NASDAQ,   163.17,  50
@@ -247,6 +248,9 @@ PFE:NYSE,      48.65,   200
 ABBV:NASDAQ,   161.89,  100
 LLY:NYSE,      291.42,  200
 ```
+
+## Order Mode
+This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol. 
 
 The client generates orders using the following method:
 1. A security is randomly selected
@@ -339,7 +343,7 @@ S - toggle states
 #### logout
 Sends a `Logout` message, waits for a `Logout` reply. In server mode, the server will listen for a new connection; in client mode the application exits
 #### toggle summary
-Toggles between summary mode and full message display mode. In summary mode, usually a single line is displayed for each message or repeating group element
+Toggles between summary mode and full message display mode. In summary mode a single line is displayed for each message or repeating group element
 #### disconnect
 Closes the session without sending a logout
 #### just exit
