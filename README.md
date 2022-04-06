@@ -6,17 +6,31 @@
 #### An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
 1.   [Introduction](#introduction)
-2.   [To download](#to-download)
-3.   [Before you build](#before-you-build)
-4.   [To build](#to-build)
-5.   [To setup your run environment](#to-setup-your-run-environment)
-6.   [CLI options](#cli-options)
-7.   [To run](#to-run)
-8.   [Order Mode](#order-mode)
-9.   [Market Data Mode](#market-data-mode)
-10.  [About the random numbers and distributions used](#about-the-random-numbers-and-distributions-used)
-11.  [Runtime Interaction](#runtime-interaction)
-12.  [Sample output](#sample-output)
+1.   [To download](#to-download)
+1.   [Before you build](#before-you-build)
+1.   [To build](#to-build)
+1.   [To setup your run environment](#to-setup-your-run-environment)
+1.   [CLI options](#cli-options)
+1.   [To run](#to-run)
+      1. [Run in Order Mode](#run-in-order-mode)
+      1. [Run in Market Data Mode](#run-in-market-data-mode)
+1.   [Order Mode](#order-mode)
+1.   [Market Data Mode](#market-data-mode)
+      1. [About the orderbook and matching](#about-the-orderbook-and-matching)
+3.   [About the random numbers and distributions used](#about-the-random-numbers-and-distributions-used)
+4.   [Runtime Interaction](#runtime-interaction)
+      1. [As Server](#as-server)
+      1. [As Client](#as-client)
+      1. [Command descriptions](#command-descriptions)
+          1. [logout](#logout)
+          1. [toggle summary](#toggle-summary)
+          1. [disconnect](#disconnect)
+          1. [just exit](#just-exit)
+          1. [resubscribe](#resubscribe)
+          1. [toggle generate](#toggle-generate)
+          1. [toggle quiet](#toggle-quiet)
+          1. [toggle states](#toggle-states)
+6.   [Sample output](#sample-output)
       1.   [Server](#server)
       1.   [Client](#client)
       1.   [Misc](#misc)
@@ -287,11 +301,11 @@ removed when no quantity or order count remains
 
 ## About the random numbers and distributions used
 We are using the following:
-1. A Mersenne twister engine (mt19937) seeded using the `std::random_device` (the seed token is overrideable)
-1. `std::uniform_int_distribution` is used to select random integers from a range
-1. `std::bernoulli_distribution` is used to select a random boolean value with a specified probability
-1. `std::cauchy_distribution` is used to randomly generate floating point numbers (prices). This distribution was chosen
-due to its kurtosis (so called 'fat-tailed') characteristics. The default scale parameter of 0.0005
+1. A [Mersenne Twister](https://en.wikipedia.org/wiki/Mersenne_Twister) engine (mt19937) seeded using the `std::random_device` (the seed token is overrideable)
+1. [`std::uniform_int_distribution`](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) is used to select random integers from a range
+1. [`std::bernoulli_distribution`](https://en.wikipedia.org/wiki/Bernoulli_distribution) is used to select a random boolean value with a specified probability
+1. [`std::cauchy_distribution`](https://en.wikipedia.org/wiki/Cauchy_distribution) is used to randomly generate floating point numbers (prices). 
+This distribution was chosen due to its kurtosis (so called 'fat-tailed') characteristics. The default scale parameter of 0.0005
 produces a narrowly distributed price around the reference price with occasional outliers. By increasing this value you can
 generate more widely distributed prices with even more radical outliers. This can simulate a more volatile market (see `-y` option)
 
@@ -299,7 +313,7 @@ generate more widely distributed prices with even more radical outliers. This ca
 A simple command menu is provided where you can control certain aspects of the application
 
 ### As Server
-```bash
+```
 l - logout
 s - toggle summary
 q - disconnect (no logout)
@@ -310,7 +324,7 @@ S - toggle states
 ? - help
 ```
 ### As Client
-```bash
+```
 l - logout and quit
 q - quit (no logout)
 x - just exit
@@ -321,7 +335,7 @@ Q - toggle quiet
 S - toggle states
 ? - help
 ```
-
+### Command descriptions
 #### logout
 Sends a `Logout` message, waits for a `Logout` reply. In server mode, the server will listen for a new connection; in client mode the application exits
 #### toggle summary
