@@ -8,7 +8,7 @@
 ##      \ \_\   \ \_\ /\_/\_\  \ \____/   \ \_\  \ \_\ \ \____/
 ##       \/_/    \/_/ \//\/_/   \/___/     \/_/   \/_/  \/___/
 ##
-##               Fix8Pro FIX Engine and Framework
+##                Fix8Pro Example Client Server
 ##
 ## Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
 ## ALL RIGHTS RESERVED  https://www.fix8mt.com  heretohelp@fix8mt.com  @fix8mt
@@ -103,7 +103,7 @@ target_link_libraries(FIX44_EXAMPLE PRIVATE fix8pro fix8proutils)
 # add_gen_static_library(FIX50SP2 schema/FIX50SP2.xml  -L --verbose --namespace FIX50SP2 -p FIX50SP2 --fixt ${CMAKE_CURRENT_SOURCE_DIR}/schema/FIXT11.xml)
 # target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
 
-add_executable(simpleclisrv src/simpleclisrv.cpp)
+add_executable(simpleclisrv src/simpleclisrv.cpp src/marketdata.cpp)
 include_directories(src)
 target_link_libraries(simpleclisrv PRIVATE FIX44_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
 

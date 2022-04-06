@@ -250,7 +250,7 @@ LLY:NYSE,      291.42,  200
 ```
 
 ## Order Mode
-This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol. 
+This is the default mode for the client and server. After the client logs in and establishes a normal session, it will begin to send `NewOrderSingle` order messages from a randomly selected symbol.
 
 The client generates orders using the following method:
 1. A security is randomly selected
@@ -278,7 +278,7 @@ The client subscribes as follows:
 1. At startup or if resubscribe is triggered, the client sends a `SecurityListRequest`;
 1. A `SecurityList` is received, containing repeating groups of all available securities
 1. From a randomly selected sub-set of these securities, `MarketDataRequest` messages are sent; `SubscriptionRequestType::SnapshotAndUpdates` is chosen;
-the default number of depth levels is set to 10. You can override this on the client command line
+the default number of depth levels is set to 10. You can override this on the client command line with the `-d` option
 
 The server operates as follows:
 1. When a `SecurityListRequest` is received the server responds with a `SecurityList` containing repeating groups of all available securities
@@ -288,12 +288,13 @@ The server operates as follows:
 Last/Volume, Total Volume, VWAP and Imbalance
 1. The other `MarketDataSnapshotFullRefresh` messages will be the full aggregated orderbook, containing all the depth levels up to the maximum requested (default 10)
 1. A `MarketDataIncrementalRefresh` is sent about 9 in 10 messages. Of these, about 1 in 4 will be cancels, the rest new orders
-1. When `MarketDataIncrementalRefresh` is sent, the orderbook is updated with either inserts or deletes (cancels), a matching algorithm then attempts to match out any new orders
-and then a difference algorithm generates a series of book deltas (see below)
+1. When an order is generated a matching algorithm attempts to match out the order; remaining volume is then inserted into the orderbook
+1. Order cancels are applied directly to the orderbook
+1. After matching or cancelling orders, a difference algorithm generates a series of book deltas
 
 ### About the orderbook and matching
 1. Each security has its own double sided aggregated orderbook. Bids are reverse sorted by price, asks are sorted by price.
-There is no unaggregated order management
+Individual (unaggregated) orders are not maintained.
 1. Each price level holds the total accumulated order quantity and the total number of orders
 1. Matching occurs only when a new order is generated; orders are matched out from the top of the book, exhausting all available
 quantity at or below (above) the best bid or offer; matched quantities are subtracted from the available quantity; price levels are
@@ -304,11 +305,11 @@ removed when no quantity or order count remains
 1. VWAP and Imbalance are calculated when a `MarketDataSnapshotFullRefresh` TOB is sent using the TPV and best bid/offer quantities
 
 ## About the random numbers and distributions used
-We are using the following:
-1. A [Mersenne Twister](https://en.wikipedia.org/wiki/Mersenne_Twister) engine (mt19937) seeded using the `std::random_device` (the seed token is overrideable)
+We are using the following pseudo-random number generation functions provided by the standard library:
+1. A [`std::mersenne_twister_engine`](https://en.wikipedia.org/wiki/Mersenne_Twister) engine (mt19937_64) seeded using the `std::random_device` (with optionally supplied implementation-defined token)
 1. [`std::uniform_int_distribution`](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) is used to select random integers from a range
 1. [`std::bernoulli_distribution`](https://en.wikipedia.org/wiki/Bernoulli_distribution) is used to select a random boolean value with a specified probability
-1. [`std::cauchy_distribution`](https://en.wikipedia.org/wiki/Cauchy_distribution) is used to randomly generate floating point numbers (prices). 
+1. [`std::cauchy_distribution`](https://en.wikipedia.org/wiki/Cauchy_distribution) is used to randomly generate floating point numbers (prices).
 This distribution was chosen due to its kurtosis (so called 'fat-tailed') characteristics. The default scale parameter of 0.0005
 produces a narrowly distributed price around the reference price with occasional outliers. By increasing this value you can
 generate more widely distributed prices with even more radical outliers. This can simulate a more volatile market (see `-y` option)

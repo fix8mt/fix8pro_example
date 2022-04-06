@@ -8,7 +8,7 @@
       \ \_\   \ \_\ /\_/\_\  \ \____/   \ \_\  \ \_\ \ \____/
        \/_/    \/_/ \//\/_/   \/___/     \/_/   \/_/  \/___/
 
-               Fix8Pro FIX Engine and Framework
+                Fix8Pro Example Client Server
 
 Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
 ALL RIGHTS RESERVED  https://www.fix8mt.com  heretohelp@fix8mt.com  @fix8mt
@@ -62,23 +62,39 @@ using namespace FIX44_EXAMPLE;
 using namespace std::string_literals;
 
 //-----------------------------------------------------------------------------------------
+using Instruments = std::map<f8String, std::tuple<double, uint32_t>>;
+using BidsAggregated = std::map<double, std::tuple<uint32_t, uint32_t>, std::greater<double>>; // price: total qty, total size
+using AsksAggregated = std::map<double, std::tuple<uint32_t, uint32_t>>; // price: total qty, total size
+using OrderBook = std::map<f8String, std::tuple<BidsAggregated, AsksAggregated>>;
+struct Daily
+{
+	double last = 0., open = 0., high = 0., low = 0., close = 0., tpv = 0.;
+	uint32_t tvol = 0, lvol = 0;
+};
+using Dailies = std::map<f8String, Daily>;
+
+//-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
-	int _giveupreset, _interval;
-	bool _server, _reliable, _hb, _quiet, _show_states, _generate, _summary;
-	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password, _capfile;
+	int _giveupreset, _interval, _depth;
+	bool _server, _reliable, _hb, _quiet, _show_states, _generate, _summary, _mdata;
+	double _cauchy_scale; // see en.wikipedia.org/wiki/Cauchy_distribution, en.wikipedia.org/wiki/Scale_parameter
+	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password, _capfile, _reffile;
 	unsigned _next_send, _next_receive;
-	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro
+	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro; you can optionally supply an implementation-defined token
 	std::unique_ptr<std::ostream> _ofptr;
 	std::unique_ptr<std::ostream, f8_deleter> _cofs;
 
+	static const Instruments _staticdata;
+	Instruments _refdata;
+
 	int main(const std::vector<f8String>& args) override; // required
-	bool options_setup(cxxopts::Options& ops) override;
+	bool options_setup() override; // calls Fix8ProApplication::add_options()
 
 	void server_session(SessionInstanceBase_ptr inst, int scnt);
 	void client_session(ClientSessionBase_ptr mc);
-	MessagePtr generate_order();
 	bool setup_capture();
+	int load_refdata();
 	std::ostream& cout() const { return *_cofs.get(); }
 
 public:
@@ -94,11 +110,11 @@ public:
 class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 {
 	Application& _app { Fix8ProApplication::get_instance<Application>() };
-
-	// ExecutionReport handler (client)
-	bool operator()(const ExecutionReport *msg) override;
-	// NewOrderSingle handler (server)
-	bool operator()(const NewOrderSingle *msg) override;
+	std::set<f8String> _subscriptions; // marketdata mode
+	std::vector<Instruments::value_type> _subscriptions_vec;
+	mutable f8_spin_lock _spin_lock;
+	OrderBook _orderbook;
+	Dailies _dailies;
 
 	// required
 	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
@@ -111,12 +127,52 @@ class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 	void print_message(const MessagePtr& msg, std::ostream& os, bool usecolour) const override;
 	void on_send_success(const MessagePtr& msg) const override;
 
+	// order mode
+	// ExecutionReport handler (client, order mode)
+	bool operator()(const ExecutionReport *msg) override;
+	// NewOrderSingle handler (server, order mode), process an order
+	bool operator()(const NewOrderSingle *msg) override;
+
+	// market data mode
+	// SecurityList handler (client, marketdata mode), handle security list result
+	bool operator()(const SecurityList *msg) override;
+	// MarketDataSnapshotFullRefresh handler (client, marketdata mode), handle market data
+	bool operator()(const MarketDataSnapshotFullRefresh *msg) override;
+	// MarketDataIncrementalRefresh handler (client, marketdata mode), handle market data
+	bool operator()(const MarketDataIncrementalRefresh *msg) override;
+	// MarketDataRequestReject handler (client, marketdata mode), handle market data request reject
+	bool operator()(const MarketDataRequestReject *msg) override;
+	// SecurityListRequest handler (server, marketdata mode), process security download request
+	bool operator()(const SecurityListRequest *msg) override;
+	// MarketDataRequest handler (server, marketdata mode), process security data request
+	bool operator()(const MarketDataRequest *msg) override;
+
+	template<typename T> bool insert_update(double price, uint32_t qty, T& book);
+	template<typename T> bool remove(double price, uint32_t qty, T& book);
+	template<typename T> int generate_obsnapshot(const T& book, MessagePtr& mdsfr) const;
+	template<typename T> int generate_delta(const T& obook, const T& nbook, const f8String& sym, MessagePtr& mdir) const;
+	template<typename T> int match(double price, uint32_t& qty, T& book, const f8String& sym, MessagePtr& mdir);
+	template<typename T> int populate_mdentry(char tag, T what, MessagePtr& mdsfr) const;
+	template<typename T> std::pair<uint32_t, int> populate_tob(T& book, MessagePtr& mdsfr) const;
+	int populate_trade(double price, uint32_t qty, MessagePtr& mdsfr) const;
+	bool create_snapshots();
+	bool create_mdsnapshot(const f8String& sym);
+	bool create_obsnapshot(const f8String& sym);
+	bool pregenerate_send_marketdata();
+	bool update_daily(double price, uint32_t qty, const f8String& sym);
+
 	// misc
 	void print_summary(const MessagePtr& msg, bool way) const;
 
 public:
 	using Session::Session;
 	~SimpleSession() = default;
+
+	bool generate_send_order();
+	bool generate_send_marketdata();
+	bool send_security_list_request();
+	bool has_subscriptions() const;
+	void unsubscribe();
 };
 
 //-----------------------------------------------------------------------------------------
@@ -141,9 +197,18 @@ namespace
 		return ch;
 	}
 
-	void toggle(f8String_view tag, bool& what, std::ostream& os)
+	void toggle(const f8String& tag, bool& what, std::ostream& os)
 	{
 		os << tag << ' ' << ((what ^= true) ? "on" : "off") << std::endl;
+	}
+
+	inline f8String strip(const f8String& from)
+	{
+		constexpr const char *ws = " \t";
+		f8String result;
+		if (const size_t bgstr(from.find_first_not_of(ws)); bgstr != f8String::npos)
+			result = from.substr(bgstr, from.find_last_not_of(ws) - bgstr + 1);
+		return std::move(result);
 	}
 }
 
