@@ -6,6 +6,7 @@
 #### An example client/server that can be used as a starting point for development using the Fix8Pro C++ Framework.
 
 1.   [Introduction](#introduction)
+1.   [Releases](#releases)
 1.   [To download](#to-download)
 1.   [Before you build](#before-you-build)
 1.   [To build](#to-build)
@@ -18,7 +19,7 @@
 1.   [Order Mode](#order-mode)
 1.   [Market Data Mode](#market-data-mode)
       1. [About the orderbook and matching](#about-the-orderbook-and-matching)
-3.   [About the random numbers and distributions used](#about-the-random-numbers-and-distributions-used)
+3.   [About random numbers, distributions and generators used](#about-random-numbers-distributions-and-generators-used)
 4.   [Runtime Interaction](#runtime-interaction)
       1. [As Server](#as-server)
       1. [As Client](#as-client)
@@ -53,8 +54,17 @@ This example uses the standard FIX44 dictionary, uses high quality pseudo-random
   <p><i>Message displayed with the built-in Fix8Pro printer</i></p>
 </kbd>
 
+## Releases
+There are a number of releases available. Each release builds on the previous in terms of complexity and functionality. These are summarised here:
+- Simple client/server with `NewOrderSingle` and `ExecutionReport` (order mode only)
+  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/dd8603eef63d71aa3d87574a688b4fc0fa592875)
+- Client/server with market data generation, simple aggregated order book (order mode and market data mode)
+  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
+- Client/server with market data history (custom FIX messages) (order mode and market data mode)
+  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
+
 ## To download
-You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases). There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version)
+There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version)
 and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge).
 
 Optionally specify the `dev` branch when you clone:
@@ -102,6 +112,8 @@ Fix8Pro sample client/server
 Usage:
   simpleclisrv [OPTION...]
 
+  -b, --brownopts arg      set the Brownian options (drift,volume,lpf)
+                           parameters (default: 0.01,20.0,0.025)
   -c, --config arg         xml config (default: simple_client.xml or
                            simple_server.xml)
   -d, --depth arg          use with market data mode, set maximum depth to
@@ -113,21 +125,22 @@ Usage:
   -l, --log arg            global log filename (default:
                            ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)
   -m, --marketdata         run in marketdata mode (default order mode)
+  -n, --numsec arg         maximum number of securities to use (default no
+                           limit) (default: 0)
   -q, --quiet              do not print fix output
   -r, --reliable           start in reliable mode (default: true)
   -s, --server             run in server mode (default client mode)
   -t, --states             show session and reliable session thread state
                            changes (default: true)
   -u, --summary            run in summary display mode
-  -y, --cauchyscale arg    set the cauchy_distribution scale parameter
-                           (default: 0.0005)
   -C, --clientsession arg  name of client session profile in xml config to
                            use (default: CLI)
   -G, --generate           generate NewOrderSingle(client) or market
                            data(server) messages (default: true)
   -H, --showheartbeats     show inbound heartbeats (default: true)
-  -I, --interval arg       client generation interval (msecs); if -ve choose
-                           random interval between 0 and -(n) (default: 5000)
+  -I, --interval arg       generation interval (msecs); if -ve choose random
+                           interval between 0 and -(n) (default: 5000)
+  -K, --tickcapture arg    capture all trade ticks to specified file
   -L, --libpath arg        library path to load Fix8 schema object, default
                            path or LD_LIBRARY_PATH
   -P, --password arg       FIX password used in logon (cleartext) (default:
@@ -161,7 +174,7 @@ Usage:
   -4, --interactive  Interactve mode, select/edit using bash-like commands,
                      (? <enter> for help)
 
-e.g.
+examples:
 cli/srv pair:
    simpleclisrv -c config/simple_server.xml -s
    simpleclisrv -c config/simple_client.xml
@@ -304,15 +317,14 @@ removed when no quantity or order count remains
 1. A 'daily' record is maintained for each security which contains Open, High, Low, Close, Last/Volume, Total Volume and Total Price Volume (TPV)
 1. VWAP and Imbalance are calculated when a `MarketDataSnapshotFullRefresh` TOB is sent using the TPV and best bid/offer quantities
 
-## About the random numbers and distributions used
+## About random numbers, distributions and generators used
 We are using the following pseudo-random number generation functions provided by the standard library:
 1. A [`std::mersenne_twister_engine`](https://en.wikipedia.org/wiki/Mersenne_Twister) engine (mt19937_64) seeded using the `std::random_device` (with optionally supplied implementation-defined token)
 1. [`std::uniform_int_distribution`](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) is used to select random integers from a range
+1. [`std::uniform_real_distribution`](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) is used to select random floating point numbers from a range
 1. [`std::bernoulli_distribution`](https://en.wikipedia.org/wiki/Bernoulli_distribution) is used to select a random boolean value with a specified probability
-1. [`std::cauchy_distribution`](https://en.wikipedia.org/wiki/Cauchy_distribution) is used to randomly generate floating point numbers (prices).
-This distribution was chosen due to its kurtosis (so called 'fat-tailed') characteristics. The default scale parameter of 0.0005
-produces a narrowly distributed price around the reference price with occasional outliers. By increasing this value you can
-generate more widely distributed prices with even more radical outliers. This can simulate a more volatile market (see `-y` option)
+
+Prices
 
 ## Runtime Interaction
 A simple command menu is provided where you can control certain aspects of the application
