@@ -20,7 +20,8 @@
 1.   [Market Data Mode](#market-data-mode)
       1. [About the orderbook and matching](#about-the-orderbook-and-matching)
 3.   [About random numbers, distributions and generators used](#about-random-numbers-distributions-and-generators-used)
-4.   [Runtime Interaction](#runtime-interaction)
+      1. [Prices](#prices)
+5.   [Runtime Interaction](#runtime-interaction)
       1. [As Server](#as-server)
       1. [As Client](#as-client)
       1. [Command descriptions](#command-descriptions)
@@ -329,12 +330,12 @@ We are using the following pseudo-random number generation functions provided by
 ### Prices
 Prices are generated using random numbers from the uniform real distribution. These are then put through a Brownian filter, described [here](https://en.wikipedia.org/wiki/Wiener_process). The parameters to this filter can be set from the command line.
 
+<kbd> ![Shows a tick chart for the symbol PEP:NASDAQ demonstrating the Browninan filter](assets/PEP_NASDAQ.png)
+  <p><i>Tick chart for the symbol PEP:NASDAQ demonstrating the Brownian filter</i></p>
+</kbd>
+
 ## Runtime Interaction
 A simple command menu is provided where you can control certain aspects of the application.
-
-<kbd> ![Shows a tick chart for the symbol PEP_NASDAQ demonstrating the Browninan filter](assets/PEP_NASDAQ.png)
-  <p><i>A simple tick chart</i></p>
-</kbd>
 
 ### As Server
 ```
