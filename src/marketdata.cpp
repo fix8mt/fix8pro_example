@@ -80,7 +80,7 @@ int SimpleSession::match(double lprice, uint32_t& lqty, T& book, const f8String&
 				<< mdir->make_field<MDEntryPx>(std::is_same_v<T, BidsAggregated> ? lprice : rprice)
 				<< mdir->make_field<Symbol>(sym);
 		*grnomden << std::move(gr1);
-		update_daily(std::is_same_v<T, BidsAggregated> ? lprice : rprice, lqty, sym);
+		update_history(std::is_same_v<T, BidsAggregated> ? lprice : rprice, lqty, sym);
 		if (lqty <= rqty)
 		{
 			rqty -= lqty;
@@ -274,12 +274,11 @@ int SimpleSession::populate_trade(double price, uint32_t qty, MessagePtr& mdsfr)
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSession::update_daily(double price, uint32_t qty, const f8String& sym)
+bool SimpleSession::update_history(double price, uint32_t qty, const f8String& sym)
 {
-	auto ditr = _dailies.find(sym);
-	auto& rec = ditr == _dailies.end() ? _dailies.emplace(sym, Daily()).first->second : ditr->second;
-	rec.last = price;
-	rec.lvol = qty;
+	auto ditr = _histories.find(sym);
+	auto& rec = ditr == _histories.end() ? _histories.emplace(sym, History()).first->second : ditr->second;
+	rec._ticks.emplace(Tickval(true), std::make_tuple(price, qty));
 	rec.tvol += qty;
 	rec.tpv += price * qty;
 	if (!rec.open)
@@ -288,14 +287,16 @@ bool SimpleSession::update_daily(double price, uint32_t qty, const f8String& sym
 		rec.low = price;
 	if (!rec.high || price > rec.high)
 		rec.high = price;
+	if (_tofs)
+		*_tofs << price << std::endl;
 	return true;
 }
 
 //-----------------------------------------------------------------------------------------
 bool SimpleSession::create_mdsnapshot(const f8String& sym)
 {
-	const auto ditr = _dailies.find(sym);
-	if (ditr == _dailies.cend())
+	const auto ditr = _histories.find(sym);
+	if (ditr == _histories.cend())
 		return false;
 	const auto& rec = ditr->second;
 	auto mdsfr = make_message<MarketDataSnapshotFullRefresh>();
@@ -310,7 +311,8 @@ bool SimpleSession::create_mdsnapshot(const f8String& sym)
 			cnt += populate_mdentry(MDEntryType::Imbalance,
 				roundtoplaces<2>((static_cast<double>(lv) - rv) / (static_cast<double>(lv) + rv)), mdsfr);
 	}
-	cnt += populate_trade(rec.last, rec.lvol, mdsfr);
+	const auto& [lprice, lqty] = rec._ticks.crbegin()->second; // most recent record
+	cnt += populate_trade(lprice, lqty, mdsfr);
 	cnt += populate_mdentry(MDEntryType::TradingSessionHighPrice, rec.high, mdsfr);
 	cnt += populate_mdentry(MDEntryType::TradingSessionLowPrice, rec.low, mdsfr);
 	cnt += populate_mdentry(MDEntryType::OpeningPrice, rec.open, mdsfr);
@@ -348,7 +350,7 @@ bool SimpleSession::create_snapshots()
 	const auto wsubs = _subscriptions_vec;
 	slck.release();
 	auto numsyms = std::uniform_int_distribution<>(1, wsubs.size())(_app._eng);
-	for (int ii = 0; ii < numsyms; ++ii)
+	for (int ii = 0; ii < numsyms && !_pause_md; ++ii)
 		// 50% depth snapshot, 50% tob/ohlc snapshot
 		std::bernoulli_distribution()(_app._eng) ? create_obsnapshot(wsubs[ii].first) : create_mdsnapshot(wsubs[ii].first);
 	return true;
@@ -359,27 +361,31 @@ bool SimpleSession::create_snapshots()
 bool SimpleSession::pregenerate_send_marketdata()
 {
 	f8_scoped_spin_lock slck(_spin_lock);
-	const auto wsubs = _subscriptions_vec;
+	auto wsubs = _subscriptions_vec;
 	slck.release();
-	for (const auto& [sym, rec] : wsubs)
+	for (auto& [sym, rec] : wsubs)
 	{
-		const auto& [rprice, rqty] = rec;
+		auto& [rprice, rlastrv, rqty] = rec;
 		const auto gencnt = std::uniform_int_distribution<>(1, 20)(_app._eng); // random gen count
 		for (int jj = 0; jj < gencnt; ++jj)
 		{
-			auto price = roundtoplaces<2>(std::cauchy_distribution<>(rprice, _app._cauchy_scale)(_app._eng));
+			rlastrv = _app._br->generate(rlastrv, std::uniform_real_distribution()(_app._eng));
+			rprice = roundtoplaces<2>(rprice + rprice * _app._brown_opts[drift] * rlastrv);
 			auto qty = std::uniform_int_distribution<>(1, rqty)(_app._eng); // random qty
 			auto obitr = _orderbook.find(sym);
 			if (obitr == _orderbook.end())
 				obitr = _orderbook.emplace(sym, make_tuple(BidsAggregated(), AsksAggregated())).first;
 			auto& [nbids, nasks] = obitr->second;
 			if (std::bernoulli_distribution()(_app._eng)) // coin toss side
-				insert_update(price, qty, nbids);
+				insert_update(rprice, qty, nbids);
 			else
-				insert_update(price, qty, nasks);
+				insert_update(rprice, qty, nasks);
 		}
 		create_obsnapshot(sym);
 	}
+	slck.acquire(_spin_lock);
+	_subscriptions_vec = std::move(wsubs);
+	slck.release();
 	return true;
 }
 
@@ -387,21 +393,30 @@ bool SimpleSession::pregenerate_send_marketdata()
 /// Generate marketdata randomly
 bool SimpleSession::generate_send_marketdata()
 {
+	if (first_only<0>::is_first())
+	{
+		if (_app.has("tickcapture"))
+			_tofs = std::make_unique<std::ofstream>(_app._tickfile.c_str(), std::ios::trunc);
+		return true;
+	}
+
+	if (_pause_md) // not ideal but will turn off md generation asynchronously
+		return true;
+
 	if (std::bernoulli_distribution(0.1)(_app._eng)) // 10% snapshots
 		return create_snapshots();
 
 	f8_scoped_spin_lock slck(_spin_lock);
-	const auto wsubs = _subscriptions_vec;
+	auto wsubs = _subscriptions_vec;
 	slck.release();
 	auto numsyms = std::uniform_int_distribution<>(1, wsubs.size())(_app._eng); // generate random number of symbols
 	auto mdir = make_message<MarketDataIncrementalRefresh>();
 	int cnt = 0;
-	for (int ii = 0; ii < numsyms; ++ii)
+	for (int ii = 0; ii < numsyms && !_pause_md; ++ii)
 	{
-		const auto& [sym, rec] = wsubs[std::uniform_int_distribution<>(0, wsubs.size() - 1)(_app._eng)]; // generate random symbol from set
-		const auto& [rprice, rqty] = rec;
+		auto& [sym, rec] = wsubs[std::uniform_int_distribution<>(0, wsubs.size() - 1)(_app._eng)]; // generate random symbol from set
+		auto& [rprice, rlastrv, rqty] = rec;
 		auto side = std::bernoulli_distribution()(_app._eng); // coin toss side
-		auto price = roundtoplaces<2>(std::cauchy_distribution<>(rprice, _app._cauchy_scale)(_app._eng));
 		auto qty = std::uniform_int_distribution<uint32_t>(1, rqty)(_app._eng); // random qty
 		auto obitr = _orderbook.find(sym);
 		bool cancel, inserted = false;
@@ -422,27 +437,33 @@ bool SimpleSession::generate_send_marketdata()
 			oasks = nasks;
 		}
 
+		rlastrv = _app._br->generate(rlastrv, std::uniform_real_distribution()(_app._eng));
+		rprice = roundtoplaces<2>(rprice + rprice * _app._brown_opts[drift] * rlastrv);
+
 		if (cancel)
 		{
 			if (side)
-				remove(price, qty, nbids);
+				remove(rprice, qty, nbids);
 			else
-				remove(price, qty, nasks);
+				remove(rprice, qty, nasks);
 		}
 		else if (side)
 		{
-			cnt += match(price, qty, nasks, sym, mdir);
+			cnt += match(rprice, qty, nasks, sym, mdir);
 			if (qty) // insert remaining
-				insert_update(price, qty, nbids);
+				insert_update(rprice, qty, nbids);
 		}
 		else
 		{
-			cnt += match(price, qty, nbids, sym, mdir);
+			cnt += match(rprice, qty, nbids, sym, mdir);
 			if (qty) // insert remaining
-				insert_update(price, qty, nasks);
+				insert_update(rprice, qty, nasks);
 		}
 		cnt += side ? generate_delta(obids, nbids, sym, mdir) : generate_delta(oasks, nasks, sym, mdir);
 	}
+	slck.acquire(_spin_lock);
+	_subscriptions_vec = std::move(wsubs);
+	slck.release();
 	if (cnt)
 	{
 		*mdir << mdir->make_field<NoMDEntries>(cnt);
@@ -566,12 +587,20 @@ bool SimpleSession::operator()(const MarketDataRequest *msg)
 				{
 					if (_subscriptions.count(sym.c_str()) == 0)
 					{
+						if (_app._maxsec && _subscriptions.size() >= _app._maxsec)
+							break;
 						_subscriptions.emplace(iitr->first);
 						_subscriptions_vec.emplace_back(iitr->first, iitr->second);
 					}
 				}
 				else
-					std::cerr << sym << " not valid" << std::endl;
+				{
+					auto mdrr = make_message<MarketDataRequestReject>();
+					*mdrr << mdrr->make_field<MDReqID>(msg->get<MDReqID>()->get())
+							<< mdrr->make_field<Text>(sym)
+							<< mdrr->make_field<MDReqRejReason>(MDReqRejReason::UnknownSymbol);
+					send(std::move(mdrr));
+				}
 			}
 		}
 		_app._depth = msg->get<MarketDepth>()->get();
@@ -602,6 +631,141 @@ bool SimpleSession::operator()(const MarketDataRequestReject *msg)
 }
 
 //-----------------------------------------------------------------------------------------
+bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
+{
+	auto calc_ohlc([](TickBar::const_iterator& st, TickBar::const_iterator se, Tickval::ticks secperiod)->auto const
+	{
+		const auto period_boundary = st->first.get_ticks() - (st->first.get_ticks() % secperiod); // start on period boundary
+		TOHLCVN tohlcvn;
+		auto& [t,o,h,l,c,v,n] = tohlcvn;
+
+		for (const auto next_boundary = period_boundary + secperiod; st != se && st->first.get_ticks() < next_boundary; ++st, ++n)
+		{
+			const auto& [price, vol] = st->second;
+			if (!o)
+			{
+				o = price;
+				t = period_boundary;
+			}
+			if (!l || price < l)
+				l = price;
+			if (!h || price > h)
+				h = price;
+			c = price;
+			v += vol;
+		}
+		return tohlcvn;
+	});
+
+	constexpr const std::array Periods
+	{
+		Tickval::noticks, Tickval::minute, Tickval::hour, Tickval::day, Tickval::week,
+		Tickval::ticks(365.2425 * Tickval::day / 12), Tickval::ticks(365.2425 * Tickval::day)
+	};
+
+	if (const auto& grnors = msg->find_group<MarketDataHistoryRequest::NoRelatedSym>(); grnors)
+	{
+		auto sb = scoped_bool(_pause_md, true, true);
+		for (const auto& pp : *grnors)
+		{
+			const auto& sym = pp->get<Symbol>()->get();
+			auto ditr = _histories.find(sym.c_str());
+			if (ditr == _histories.cend())
+			{
+				auto mdrr = make_message<MarketDataRequestReject>();
+				*mdrr << mdrr->make_field<MDReqID>(msg->get<MDReqID>()->get())
+						<< mdrr->make_field<MDReqRejReason>(MDReqRejReason::UnknownSymbol);
+				send(std::move(mdrr));
+				break;
+			}
+			auto& rec = ditr->second;
+
+			switch(const auto val = msg->get<MDHistoryPeriod>()->get())
+			{
+			case MDHistoryPeriod::Tick:
+				{
+					int cnt = 0, rcnt;
+					for (auto itr = rec._ticks.cbegin(); itr != rec._ticks.cend();)
+					{
+						auto mdfr = make_message<MarketDataHistoryFullRefresh>();
+						const auto& grnomden = mdfr->find_group<MarketDataHistoryFullRefresh::NoMDHistory>();
+						for (rcnt = 0; rcnt < 20 && itr != rec._ticks.cend(); ++itr)
+						{
+							const auto& [px, qty] = itr->second;
+							auto gr1 = grnomden->create_group();
+							*gr1 	<< mdfr->make_field<LastPx>(px)
+									<< mdfr->make_field<LastQty>(qty)
+									<< mdfr->make_field<TransactTime>(itr->first);
+							*grnomden << std::move(gr1);
+							++rcnt, ++cnt;
+						}
+						*mdfr << mdfr->make_field<MDReqID>(msg->get<MDReqID>()->get())
+								<< mdfr->make_field<Symbol>(sym)
+								<< mdfr->make_field<MDHistoryPeriod>(MDHistoryPeriod::Tick)
+								<< mdfr->make_field<NoMDHistory>(rcnt);
+						if (cnt == rec._ticks.size())
+							*mdfr << mdfr->make_field<LastHistoryMessage>(true);
+						send(std::move(mdfr));
+					}
+				}
+				break;
+			case MDHistoryPeriod::Minute:
+			case MDHistoryPeriod::Hour:
+			case MDHistoryPeriod::Day:
+			case MDHistoryPeriod::Week:
+			case MDHistoryPeriod::Month:
+			case MDHistoryPeriod::Year:
+				{
+					int cnt = 0, rcnt;
+					for (auto itr = rec._ticks.cbegin(); itr != rec._ticks.cend();)
+					{
+						auto mdfr = make_message<MarketDataHistoryFullRefresh>();
+						const auto& grnomden = mdfr->find_group<MarketDataHistoryFullRefresh::NoMDHistory>();
+						for (rcnt = 0; rcnt < 20 && itr != rec._ticks.cend(); ++rcnt, ++cnt)
+						{
+							auto [t,o,h,l,c,v,n] = calc_ohlc(itr, rec._ticks.cend(), Periods[val]);
+							auto gr1 = grnomden->create_group();
+							*gr1 	<< mdfr->make_field<OpenPx>(o)
+									<< mdfr->make_field<HighPx>(h)
+									<< mdfr->make_field<LowPx>(l)
+									<< mdfr->make_field<ClosePx>(c)
+									<< mdfr->make_field<CumQty>(v)
+									<< mdfr->make_field<NumTicks>(n)
+									<< mdfr->make_field<TransactTime>(t);
+							*grnomden << std::move(gr1);
+						}
+						*mdfr << mdfr->make_field<MDReqID>(msg->get<MDReqID>()->get())
+								<< mdfr->make_field<Symbol>(sym)
+								<< mdfr->make_field<MDHistoryPeriod>(val)
+								<< mdfr->make_field<NoMDHistory>(rcnt);
+						if (rcnt < 20)
+							*mdfr << mdfr->make_field<LastHistoryMessage>(true);
+						send(std::move(mdfr));
+					}
+				}
+				break;
+			default:
+				{
+					auto mdrr = make_message<MarketDataRequestReject>();
+					*mdrr << mdrr->make_field<MDReqID>(msg->get<MDReqID>()->get())
+							<< mdrr->make_field<MDReqRejReason>(MDReqRejReason::UnsupportedScope);
+					send(std::move(mdrr));
+				}
+				break;
+			}
+		}
+	}
+
+	return true;
+}
+
+//-----------------------------------------------------------------------------------------
+bool SimpleSession::operator()(const MarketDataHistoryFullRefresh *msg)
+{
+	return true;
+}
+
+//-----------------------------------------------------------------------------------------
 /// See if we have any subscribers
 bool SimpleSession::has_subscriptions() const
 {
@@ -610,8 +774,60 @@ bool SimpleSession::has_subscriptions() const
 }
 
 //-----------------------------------------------------------------------------------------
+bool SimpleSession::request_history()
+{
+	set_mprint(2); // turn off verbose printing if on
+	f8String sym = strip(Application::get_val("Enter symbol", f8String()));
+	int per = Application::get_val("Enter period(0-6)", 0);
+	if (!_app._quiet)
+		set_mprint(1); // turn on verbose printing if was on
+	if (!sym.empty() && 0 <= per && per <= 6)
+	{
+		static unsigned rid = 0;
+		auto mdr = make_message<MarketDataHistoryRequest>();
+		const auto& grnors = mdr->find_group<MarketDataHistoryRequest::NoRelatedSym>();
+		auto gr1 = grnors->create_group();
+		*gr1 << mdr->make_field<Symbol>(sym)
+			  << mdr->make_field<SecurityType>(SecurityType::CommonStock);
+		*grnors << std::move(gr1);
+		*mdr << mdr->make_field<NoRelatedSym>(1)
+			  << mdr->make_field<MDHistoryPeriod>(per)
+			  << mdr->make_field<MDReqID>(make_id(++rid));
+		send(std::move(mdr));
+	}
+	return true;
+}
+
+//-----------------------------------------------------------------------------------------
 void SimpleSession::unsubscribe()
 {
+	if (!_app._server)
+	{
+		f8_scoped_spin_lock slck(_spin_lock);
+		auto subscriptions = _subscriptions;
+		slck.release();
+		if (!subscriptions.empty())
+		{
+			auto mdr = make_message<MarketDataRequest>();
+			const auto& grnors = mdr->find_group<MarketDataRequest::NoRelatedSym>();
+			int cnt = 0;
+			for (const auto& pp : subscriptions)
+			{
+				auto gr1 = grnors->create_group();
+				*gr1 << mdr->make_field<Symbol>(pp);
+				*grnors << std::move(gr1);
+				++cnt;
+			}
+
+			static unsigned rid = 0;
+			*mdr << mdr->make_field<NoRelatedSym>(cnt)
+				  << mdr->make_field<NoMDEntryTypes>(0)
+				  << mdr->make_field<MDReqID>(make_id(++rid))
+				  << mdr->make_field<SubscriptionRequestType>(SubscriptionRequestType::DisablePreviousSnapshot);
+			send(std::move(mdr));
+		}
+	}
+
 	f8_scoped_spin_lock slck(_spin_lock);
 	_subscriptions.clear();
 	_subscriptions_vec.clear();

@@ -92,7 +92,7 @@ include_directories(${FIX8PRO_ROOT}/include)
 include_directories(${CMAKE_BINARY_DIR}/include)
 
 # shared FIX44 lib
-add_gen_shared_library(FIX44_EXAMPLE schema/FIX44.xml -G ${CMAKE_SOURCE_DIR}/schema/FIX44_en_phrases.xml -L -U --verbose --namespace FIX44_EXAMPLE -p FIX44_EXAMPLE)
+add_gen_shared_library(FIX44_EXAMPLE schema/FIX44_custom.xml -G ${CMAKE_SOURCE_DIR}/schema/FIX44_en_phrases_custom.xml -L -U --verbose --namespace FIX44_EXAMPLE -p FIX44_EXAMPLE)
 target_link_libraries(FIX44_EXAMPLE PRIVATE fix8pro fix8proutils)
 
 # shared FIX42 lib

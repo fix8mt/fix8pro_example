@@ -62,28 +62,54 @@ using namespace FIX44_EXAMPLE;
 using namespace std::string_literals;
 
 //-----------------------------------------------------------------------------------------
-using Instruments = std::map<f8String, std::tuple<double, uint32_t>>;
+struct Detail
+{
+	double _ref, _lastrv;
+	uint32_t _qty;
+
+	Detail(double ref = 0., double lastrv = 0., uint32_t qty = 0) : _ref(ref), _lastrv(lastrv), _qty(qty) {}
+};
+using Instruments = std::map<f8String, Detail>;
 using BidsAggregated = std::map<double, std::tuple<uint32_t, uint32_t>, std::greater<double>>; // price: total qty, total size
 using AsksAggregated = std::map<double, std::tuple<uint32_t, uint32_t>>; // price: total qty, total size
 using OrderBook = std::map<f8String, std::tuple<BidsAggregated, AsksAggregated>>;
-struct Daily
+using TickBar = std::map<Tickval, std::tuple<double, uint32_t>>;
+using TOHLCVN = std::tuple<Tickval, double, double, double, double, uint32_t, uint32_t>;
+struct History
 {
-	double last = 0., open = 0., high = 0., low = 0., close = 0., tpv = 0.;
-	uint32_t tvol = 0, lvol = 0;
+	TickBar _ticks; // tick history - time:price/qty
+	double open = 0., high = 0., low = 0., close = 0., tpv = 0.;
+	uint32_t tvol = 0;
 };
-using Dailies = std::map<f8String, Daily>;
+using Histories = std::map<f8String, History>;
+
+//-----------------------------------------------------------------------------------------
+class Brownian final
+{
+	const double _volume, _lpf;
+
+public:
+	Brownian(double volume, double lpf) : _volume(volume), _lpf(lpf) {}
+	constexpr double generate(double last, double rndv) const
+	{
+		return last - _lpf * (last - (2.0 * rndv - 1.0) / _volume); // rc filter
+	}
+};
+
+enum BrownParams { drift, volume, lpf };
 
 //-----------------------------------------------------------------------------------------
 class Application final : public Fix8ProApplication
 {
-	int _giveupreset, _interval, _depth;
+	int _giveupreset, _interval, _depth, _maxsec;
 	bool _server, _reliable, _hb, _quiet, _show_states, _generate, _summary, _mdata;
-	double _cauchy_scale; // see en.wikipedia.org/wiki/Cauchy_distribution, en.wikipedia.org/wiki/Scale_parameter
-	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password, _capfile, _reffile;
+	std::vector<double> _brown_opts;
+	f8String _libdir, _clcf, _global_logger_name, _sses, _cses, _libpath, _tname, _username, _password, _capfile, _reffile, _tickfile = "ticks.dat";
 	unsigned _next_send, _next_receive;
 	std::mt19937_64 _eng = create_seeded_mersenne_engine(); // provided by fix8pro; you can optionally supply an implementation-defined token
 	std::unique_ptr<std::ostream> _ofptr;
 	std::unique_ptr<std::ostream, f8_deleter> _cofs;
+	std::unique_ptr<Brownian> _br;
 
 	static const Instruments _staticdata;
 	Instruments _refdata;
@@ -113,8 +139,10 @@ class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 	std::set<f8String> _subscriptions; // marketdata mode
 	std::vector<Instruments::value_type> _subscriptions_vec;
 	mutable f8_spin_lock _spin_lock;
+	f8_atomic<bool> _pause_md { false };
 	OrderBook _orderbook;
-	Dailies _dailies;
+	Histories _histories;
+	std::unique_ptr<std::ofstream> _tofs;
 
 	// required
 	bool handle_application(unsigned seqnum, MessagePtr& msg) override;
@@ -146,6 +174,10 @@ class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 	bool operator()(const SecurityListRequest *msg) override;
 	// MarketDataRequest handler (server, marketdata mode), process security data request
 	bool operator()(const MarketDataRequest *msg) override;
+	// MarketDataHistoryRequest handler (server, marketdata mode), process security history request: User Defined Message
+	bool operator()(const MarketDataHistoryRequest *msg) override;
+	// MarketDataHistoryFullRefresh handler (server, marketdata mode), process security history: User Defined Message
+	bool operator()(const MarketDataHistoryFullRefresh *msg) override;
 
 	template<typename T> bool insert_update(double price, uint32_t qty, T& book);
 	template<typename T> bool remove(double price, uint32_t qty, T& book);
@@ -159,7 +191,7 @@ class SimpleSession final : public Session, FIX44_EXAMPLE_Router
 	bool create_mdsnapshot(const f8String& sym);
 	bool create_obsnapshot(const f8String& sym);
 	bool pregenerate_send_marketdata();
-	bool update_daily(double price, uint32_t qty, const f8String& sym);
+	bool update_history(double price, uint32_t qty, const f8String& sym);
 
 	// misc
 	void print_summary(const MessagePtr& msg, bool way) const;
@@ -172,6 +204,8 @@ public:
 	bool generate_send_marketdata();
 	bool send_security_list_request();
 	bool has_subscriptions() const;
+	bool request_history();
+	void set_mprint(int way=0); // 0=toggle 1=on 2=off
 	void unsubscribe();
 };
 
@@ -266,7 +300,7 @@ class filtercolourteebuf : public teebuf // filters colour escape sequences
 	}
 
 public:
-	filtercolourteebuf(std::streambuf *sb1, std::streambuf *sb2) : teebuf(sb1, sb2) {}
+	using teebuf::teebuf;
 };
 
 //-----------------------------------------------------------------------------------------

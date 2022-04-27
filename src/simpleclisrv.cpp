@@ -67,16 +67,16 @@ Fix8ProApplicationInstance(Application, "simpleclisrv", Fix8Pro::copyright_strin
 //-----------------------------------------------------------------------------------------
 const Instruments Application::_staticdata
 {
-	{ "AAPL:NASDAQ",	{ 163.17,	50 } },	{ "MSFT:NASDAQ",	{ 289.86,	50 } },
-	{ "GOOG:NASDAQ",	{ 2642.44,	100 } },	{ "AMZN:NASDAQ",	{ 2912.82,	100 } },
-	{ "TSLA:NASDAQ",	{ 838.29,	120 } },	{ "MMM:NYSE",		{ 149.5,		120 } },
-	{ "FB:NASDAQ",		{ 200.06,	120 } },	{ "NVDA:NASDAQ",	{ 229.36,	120 } },
-	{ "UNH:NYSE",		{ 498.65,	120 } },	{ "JNJ:NYSE",		{ 169.48,	120 } },
-	{ "V:NYSE",			{ 200.29,	120 } },	{ "JPM:NYSE",		{ 134.40,	300 } },
-	{ "WMT:NYSE",		{ 142.82,	300 } },	{ "PG:NYSE",		{ 155.14,	300 } },
-	{ "XOM:NYSE",		{ 84.09,		300 } },	{ "HD:NYSE",		{ 324.26,	300 } },
-	{ "BAC:NYSE",		{ 40.95,		200 } },	{ "MC:NYSE",		{ 330.76,	200 } },
-	{ "CVX:NYSE",		{ 158.65,	200 } },	{ "PFE:NYSE",		{ 48.65,		200 } },
+	{ "AAPL:NASDAQ",	{ 163.17,	0.,	50 } },	{ "MSFT:NASDAQ",	{ 289.86,	0.,	50 } },
+	{ "GOOG:NASDAQ",	{ 2642.44,	0.,	100 } },	{ "AMZN:NASDAQ",	{ 2912.82,	0.,	100 } },
+	{ "TSLA:NASDAQ",	{ 838.29,	0.,	120 } },	{ "MMM:NYSE",		{ 149.5,		0.,	120 } },
+	{ "FB:NASDAQ",		{ 200.06,	0.,	120 } },	{ "NVDA:NASDAQ",	{ 229.36,	0.,	120 } },
+	{ "UNH:NYSE",		{ 498.65,	0.,	120 } },	{ "JNJ:NYSE",		{ 169.48,	0.,	120 } },
+	{ "V:NYSE",			{ 200.29,	0.,	120 } },	{ "JPM:NYSE",		{ 134.40,	0.,	300 } },
+	{ "WMT:NYSE",		{ 142.82,	0.,	300 } },	{ "PG:NYSE",		{ 155.14,	0.,	300 } },
+	{ "XOM:NYSE",		{ 84.09,		0.,	300 } },	{ "HD:NYSE",		{ 324.26,	0.,	300 } },
+	{ "BAC:NYSE",		{ 40.95,		0.,	200 } },	{ "MC:NYSE",		{ 330.76,	0.,	200 } },
+	{ "CVX:NYSE",		{ 158.65,	0.,	200 } },	{ "PFE:NYSE",		{ 48.65,		0.,	200 } },
 };
 
 //-----------------------------------------------------------------------------------------
@@ -84,6 +84,7 @@ const Instruments Application::_staticdata
 bool Application::options_setup()
 {
 	add_options() // see cxxopts (https://github.com/jarro2783/cxxopts) for info about how Options work
+		("b,brownopts", "set the Brownian options (drift,volume,lpf) parameters", value<std::vector<double>>(_brown_opts)->default_value("0.01,20.0,0.025"))
 		("c,config", "xml config (default: simple_client.xml or simple_server.xml)", value<f8String>(_clcf))
 		("d,depth", "use with market data mode, set maximum depth to request on subscription", value<int>(_depth)->default_value("10"))
 		("f,refdata", "specify alternate security reference data", value<f8String>(_reffile))
@@ -91,16 +92,17 @@ bool Application::options_setup()
 		("k,capture", "capture all screen output to specified file", value<f8String>(_capfile))
 		("l,log", "global log filename (default: ./run/client_%{DATE}_global.log or ./run/server_%{DATE}_global.log)", value<f8String>(_global_logger_name))
 		("m,marketdata", "run in marketdata mode (default order mode)", value<bool>(_mdata)->default_value("false"))
+		("n,numsec", "maximum number of securities to use (default no limit)", value<int>(_maxsec)->default_value("0"))
 		("q,quiet", "do not print fix output", value<bool>(_quiet)->default_value("false"))
 		("r,reliable", "start in reliable mode", value<bool>(_reliable)->default_value("true")->implicit_value("false"))
 		("s,server", "run in server mode (default client mode)", value<bool>(_server)->default_value("false"))
 		("t,states", "show session and reliable session thread state changes", value<bool>(_show_states)->default_value("true")->implicit_value("false"))
 		("u,summary", "run in summary display mode", value<bool>(_summary)->default_value("false"))
-		("y,cauchyscale", "set the cauchy_distribution scale parameter", value<double>(_cauchy_scale)->default_value("0.0005"))
 		("C,clientsession", "name of client session profile in xml config to use", value<f8String>(_cses)->default_value("CLI"))
 		("G,generate", "generate NewOrderSingle(client) or market data(server) messages", value<bool>(_generate)->default_value("true")->implicit_value("false"))
 		("H,showheartbeats", "show inbound heartbeats", value<bool>(_hb)->default_value("true")->implicit_value("false"))
-		("I,interval", "client generation interval (msecs); if -ve choose random interval between 0 and -(n)", value<int>(_interval)->default_value("5000"))
+		("I,interval", "generation interval (msecs); if -ve choose random interval between 0 and -(n)", value<int>(_interval)->default_value("5000"))
+		("K,tickcapture", "capture all trade ticks to specified file", value<f8String>(_tickfile))
 		("L,libpath", "library path to load Fix8 schema object, default path or LD_LIBRARY_PATH", value<f8String>(_libdir))
 		("P,password", "FIX password used in logon (cleartext)", value<f8String>(_password)->default_value("password"))
 		("R,receive", "set next expected receive sequence number", value<unsigned>(_next_receive)->default_value("0"))
@@ -165,6 +167,9 @@ int Application::main(const std::vector<f8String>& args)
 
 		// load securities
 		cout() << "loaded: " << load_refdata() << " securities" << std::endl;
+
+		// set Brownian parameters
+		_br = std::make_unique<Brownian>(_brown_opts[volume], _brown_opts[lpf]);
 
 		if (_server)
 		{
@@ -251,7 +256,7 @@ void Application::server_session(SessionInstanceBase_ptr inst, int scnt)
 		case 'x':
 			exit(1);
 		case 'Q':
-			ses->control() ^= (_hb ? Session::print : Session::printnohb);
+			ses->set_mprint();
 			toggle("quiet", _quiet, cout());
 			break;
 		default:
@@ -263,10 +268,12 @@ R"(l - logout
 s - toggle summary
 q - disconnect (no logout)
 x - just exit
-g - toggle generate (market data mode)
 Q - toggle quiet
 S - toggle states
 ? - help)" << std::endl;
+			if (_mdata)
+				cout() <<
+R"(g - toggle generate)" << std::endl;
 			break;
 		case 0:
 			if (_mdata && _generate && ses->get_session_state() == States::st_continuous && ses->has_subscriptions())
@@ -307,7 +314,7 @@ void Application::client_session(ClientSessionBase_ptr mc)
 			toggle("states", _show_states, cout());
 			break;
 		case 'Q':
-			ses->control() ^= (_hb ? Session::print : Session::printnohb);
+			ses->set_mprint();
 			toggle("quiet", _quiet, cout());
 			break;
 		case 'g':
@@ -322,17 +329,30 @@ void Application::client_session(ClientSessionBase_ptr mc)
 R"(l - logout and quit
 q - quit (no logout)
 x - just exit
-g - toggle generate (order mode)
-G - resubscribe (market data mode)
 s - toggle summary
 Q - toggle quiet
 S - toggle states
 ? - help)" << std::endl;
+			if (_mdata)
+				cout() <<
+R"(G - resubscribe
+u - unsubscribe
+m - request history)" << std::endl;
+			else
+				cout() <<
+R"(g - toggle generate)" << std::endl;
 			break;
+		case 'm':
+			if (_mdata)
+				ses->request_history();
+			break;
+		case 'u':
 		case 'G':
 			if (!_mdata)
 				break;
 			ses->unsubscribe();
+			if (ch == 'u')
+				break;
 			[[fallthrough]];
 		case 0:
 			if (_generate && ses->get_session_state() == States::st_continuous)
@@ -370,6 +390,7 @@ bool Application::setup_capture()
 }
 
 //-----------------------------------------------------------------------------------------
+/// Read security reference data from CSV or load static data
 int Application::load_refdata()
 {
 	if (has("refdata"))
@@ -392,7 +413,7 @@ int Application::load_refdata()
 				pstr >> buf >> price >> qty;
 				if (!buf.empty() && price && qty)
 				{
-					if (!_refdata.emplace(buf, std::make_tuple(price, qty)).second)
+					if (!_refdata.emplace(buf, Detail(price, 0., qty)).second)
 						std::cerr << "Failed to insert (" << lcnt << ") " << buf << " (duplicate?) - ignoring" << std::endl;
 				}
 				else
@@ -439,15 +460,18 @@ bool SimpleSession::authenticate(SessionID& id, const MessagePtr& msg)
 bool SimpleSession::generate_send_order()
 {
 	static unsigned oid = 0;
-	auto itr = std::next(_app._refdata.cbegin(), std::uniform_int_distribution<>(0, _app._refdata.size() - 1)(_app._eng));
+	auto itr = std::next(_app._refdata.begin(), std::uniform_int_distribution<>(0, _app._refdata.size() - 1)(_app._eng));
+
+	itr->second._lastrv = _app._br->generate(itr->second._lastrv, std::uniform_real_distribution()(_app._eng));
+	itr->second._ref = roundtoplaces<2>(itr->second._ref + itr->second._ref * _app._brown_opts[drift] * itr->second._lastrv);
 
 	auto nos = make_message<NewOrderSingle>();
 	*nos << nos->make_field<TransactTime>() // defaults to now
 		  << nos->make_field<Symbol>(itr->first)
 		  << nos->make_field<ClOrdID>('C' + tp_to_string(Tickval(true).get_time_point(), R"(%Y%m%d)") + make_id(++oid))
 		  << nos->make_field<HandlInst>(std::uniform_int_distribution<>(1, HandlInst::count)(_app._eng) + '0') // random hi
-		  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, std::get<1>(itr->second))(_app._eng)) // random qty
-		  << nos->make_field<Price>(roundtoplaces<2>(std::cauchy_distribution<>(std::get<0>(itr->second), _app._cauchy_scale)(_app._eng)), 2) // using more realistic cauchy 'fat tail'; 2 decimal places if necessary
+		  << nos->make_field<OrderQty>(std::uniform_int_distribution<>(1, itr->second._qty)(_app._eng)) // random qty
+		  << nos->make_field<Price>(itr->second._ref, 2)
 		  << nos->make_field<OrdType>(OrdType::Limit)
 		  << nos->make_field<Side>(std::bernoulli_distribution()(_app._eng) ? Side::Buy : Side::Sell) // coin toss side
 		  << nos->make_field<TimeInForce>(std::uniform_int_distribution<>(0, TimeInForce::count - 1)(_app._eng) + '0'); // random tif
@@ -526,6 +550,14 @@ void SimpleSession::print_summary(const MessagePtr& msg, bool way) const
 			_app.cout() << std::endl;
 		}
 	}
+}
+
+//-----------------------------------------------------------------------------------------
+void SimpleSession::set_mprint(int way)
+{
+	auto flag = _app._hb ? Session::print : Session::printnohb;
+	if (auto curr = _control & flag; way == 0 || (way == 1 && !curr) || (way == 2 && curr))
+		_control ^= flag;
 }
 
 //-----------------------------------------------------------------------------------------

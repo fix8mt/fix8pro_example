@@ -25620,6 +25620,16 @@
          <para>The Confirmation Request message is used to request a Confirmation message.</para>
       </text>
    </phrase>
+   <phrase textId="CUSTOM_MSG_1">
+      <text purpose="SYNOPSIS">
+         <para>Custom message. Used to request market data history.</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_MSG_2">
+      <text purpose="SYNOPSIS">
+         <para>Custom message. Used to deliver market data history.</para>
+      </text>
+   </phrase>
    <!--TEST IN gen_i18n-map--><phrase textId="TEST">
       <text purpose="TEST">
 							BEFORE CALL MSGCOMP_FIELDS_DESCS in gen_i18n FOR MESSAGES
@@ -29821,5 +29831,84 @@
    </phrase>
    <phrase textId="CMP_2080_REF_954">
       <text/>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_1">
+      <text purpose="SYNOPSIS">
+         <para>The market data history period; will result in period aggregated (OHLC) data or tick data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_1">
+      <text purpose="SYNOPSIS">
+         <para>Tick data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_2">
+      <text purpose="SYNOPSIS">
+         <para>Minute data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_3">
+      <text purpose="SYNOPSIS">
+         <para>Hour data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_4">
+      <text purpose="SYNOPSIS">
+         <para>Day data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_5">
+      <text purpose="SYNOPSIS">
+         <para>Week data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_6">
+      <text purpose="SYNOPSIS">
+         <para>Month data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_7">
+      <text purpose="SYNOPSIS">
+         <para>Year data</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_2">
+      <text purpose="SYNOPSIS">
+         <para>Indicates if this message is the last in market data series being delivered</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_3">
+      <text purpose="SYNOPSIS">
+         <para>Opening price in OHLC series</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_4">
+      <text purpose="SYNOPSIS">
+         <para>Closing price in OHLC series</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_5">
+      <text purpose="SYNOPSIS">
+         <para>Number of repeating elements in MD history message</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_FIELD_6">
+      <text purpose="SYNOPSIS">
+         <para>Number of ticks in this period</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_8">
+      <text purpose="SYNOPSIS">
+         <para>Last message</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_ENUM_9">
+      <text purpose="SYNOPSIS">
+         <para>Not last message</para>
+      </text>
+   </phrase>
+   <phrase textId="CUSTOM_COMP_1">
+      <text purpose="SYNOPSIS"/>
+      <text purpose="ELABORATION"/>
    </phrase>
 </phrases>

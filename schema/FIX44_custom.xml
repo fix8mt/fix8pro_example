@@ -41,7 +41,7 @@ THIRD PARTIES OR A FAILURE OF THE PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), E
 HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
 -->
-<fix major="4" type="FIX" servicepack="0" minor="4" version="FIX.4.4" description="Standard FIX44" repo_generation_date="2014-05-07T17:07:21-04:00">
+<fix major="4" type="FIX" servicepack="26" minor="4" version="FIX.4.4" description="Standard FIX44" repo_generation_date="2014-05-07T17:07:21-04:00">
  <header>
   <field name='BeginString' required='Y' />
   <field name='BodyLength' required='Y' />
@@ -2393,6 +2393,19 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
    <field name="EncodedTextLen" required="N" />
    <field name="EncodedText" required="N" />
   </message>
+  <!-- Custom Messages *-->
+  <message name="MarketDataHistoryRequest" msgtype="UR" msgcat="app" textId="CUSTOM_MSG_1">
+   <field name="MDReqID" required="Y" />
+	<field name="MDHistoryPeriod" required="Y" />
+   <component name="InstrmtMDReqGrp" required="Y" />
+  </message>
+  <message name="MarketDataHistoryFullRefresh" msgtype="UH" msgcat="app" textId="CUSTOM_MSG_2">
+   <field name="MDReqID" required="N" />
+	<field name="MDHistoryPeriod" required="N" />
+	<field name="LastHistoryMessage" required="N" />
+   <component name="Instrument" required="Y" />
+   <component name="MDHistory" required="Y" />
+  </message>
  </messages>
  <trailer />
  <components>
@@ -3802,6 +3815,20 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
     <field name="Nested3PartySubIDType" required="N" />
    </group>
   </component>
+  <!-- Custom Components *-->
+  <component name="MDHistory" textId="CUSTOM_COMP_1">
+   <group name="NoMDHistory" required="N" >
+		<field name="TransactTime" required="N" />
+		<field name="LastPx" required="N" />
+		<field name="LastQty" required="N" />
+		<field name="OpenPx" required="N" />
+		<field name="HighPx" required="N" />
+		<field name="LowPx" required="N" />
+		<field name="ClosePx" required="N" />
+		<field name="CumQty" required="N" />
+		<field name="NumTicks" required="N" />
+   </group>
+   </component>
  </components>
  <fields>
   <field number="1" name="Account" type="STRING" textId="FIELD_1" />
@@ -4028,6 +4055,8 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
    <value enum="x" description="SecurityListRequest" textId="ENUM_35_x" />
    <value enum="y" description="SecurityList" textId="ENUM_35_y" />
    <value enum="z" description="DerivativeSecurityListRequest" textId="ENUM_35_z" />
+   <value enum="UR" description="MarketDataHistoryRequest" />
+   <value enum="UH" description="MarketDataHistoryFullRefresh" />
   </field>
   <field number="36" name="NewSeqNo" type="SEQNUM" textId="FIELD_36" />
   <field number="37" name="OrderID" type="STRING" textId="FIELD_37" />
@@ -4722,6 +4751,19 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
    <value enum="A" description="Imbalance" textId="ENUM_269_A" />
    <value enum="B" description="TradeVolume" textId="ENUM_269_B" />
    <value enum="C" description="OpenInterest" textId="ENUM_269_C" />
+	<value enum="D" description="CompositeUnderlyingPrice" textId="ENUM_269_D" />
+	<value enum="E" description="SimulatedSellPrice" textId="ENUM_269_E" />
+	<value enum="F" description="SimulatedBuyPrice" textId="ENUM_269_F" />
+	<value enum="G" description="MarginRate" textId="ENUM_269_G" />
+	<value enum="H" description="MidPrice" textId="ENUM_269_H" />
+	<value enum="J" description="EmptyBook" textId="ENUM_269_J" />
+	<value enum="K" description="SettleHighPrice" textId="ENUM_269_K" />
+	<value enum="L" description="SettleLowPrice" textId="ENUM_269_L" />
+	<value enum="M" description="PriorSettlePrice" textId="ENUM_269_M" />
+	<value enum="N" description="SessionHighBid" textId="ENUM_269_N" />
+	<value enum="O" description="SessionLowOffer" textId="ENUM_269_O" />
+	<value enum="P" description="EarlyPrices" textId="ENUM_269_P" />
+	<value enum="Q" description="AuctionClearingPrice" textId="ENUM_269_Q" />
   </field>
   <field number="270" name="MDEntryPx" type="PRICE" textId="FIELD_270" />
   <field number="271" name="MDEntrySize" type="QTY" textId="FIELD_271" />
@@ -6669,5 +6711,23 @@ HOLDER OR OTHER PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
   <field number="954" name="Nested3PartySubIDType" type="INT" textId="FIELD_954" />
   <field number="955" name="LegContractSettlMonth" type="MONTHYEAR" textId="FIELD_955" />
   <field number="956" name="LegInterestAccrualDate" type="LOCALMKTDATE" textId="FIELD_956" />
+  <!-- Custom Fields *-->
+  <field number="10500" name="MDHistoryPeriod" type="INT" textId="CUSTOM_FIELD_1">
+   <value enum="0" description="Tick" textId="CUSTOM_ENUM_1" />
+   <value enum="1" description="Minute" textId="CUSTOM_ENUM_2" />
+   <value enum="2" description="Hour" textId="CUSTOM_ENUM_3" />
+   <value enum="3" description="Day" textId="CUSTOM_ENUM_4" />
+   <value enum="4" description="Week" textId="CUSTOM_ENUM_5" />
+   <value enum="5" description="Month" textId="CUSTOM_ENUM_6" />
+   <value enum="6" description="Year" textId="CUSTOM_ENUM_7" />
+  </field>
+  <field number="10501" name="LastHistoryMessage" type="BOOLEAN" textId="CUSTOM_FIELD_2">
+   <value enum="Y" description="LastMessageInSeries" textId="CUSTOM_ENUM_8" />
+   <value enum="N" description="NotLastMessageInSeries" textId="CUSTOM_ENUM_9" />
+  </field>
+  <field number="10502" name="OpenPx" type="PRICE" textId="CUSTOM_FIELD_3" />
+  <field number="10503" name="ClosePx" type="PRICE" textId="CUSTOM_FIELD_4" />
+  <field number="10504" name="NoMDHistory" type="NUMINGROUP" textId="CUSTOM_FIELD_5" />
+  <field number="10505" name="NumTicks" type="INT" textId="CUSTOM_FIELD_6" />
  </fields>
 </fix>
