@@ -63,6 +63,8 @@ There are a number of releases available. Each release builds on the previous in
 - Client/server with market data history (custom FIX messages) (order mode and market data mode)
   - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
 
+You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases). 
+
 ## To download
 There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version)
 and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge).
@@ -324,7 +326,8 @@ We are using the following pseudo-random number generation functions provided by
 1. [`std::uniform_real_distribution`](https://en.wikipedia.org/wiki/Discrete_uniform_distribution) is used to select random floating point numbers from a range
 1. [`std::bernoulli_distribution`](https://en.wikipedia.org/wiki/Bernoulli_distribution) is used to select a random boolean value with a specified probability
 
-Prices
+### Prices
+Prices are generated using random numbers from the uniform real distribution. These are then put through a Brownian filter, described [here](https://en.wikipedia.org/wiki/Wiener_process). The parameters to this filter can be set from the command line.
 
 ## Runtime Interaction
 A simple command menu is provided where you can control certain aspects of the application
