@@ -330,7 +330,11 @@ We are using the following pseudo-random number generation functions provided by
 Prices are generated using random numbers from the uniform real distribution. These are then put through a Brownian filter, described [here](https://en.wikipedia.org/wiki/Wiener_process). The parameters to this filter can be set from the command line.
 
 ## Runtime Interaction
-A simple command menu is provided where you can control certain aspects of the application
+A simple command menu is provided where you can control certain aspects of the application.
+
+<kbd> ![Shows a tick chart for the symbol PEP_NASDAQ demonstrating the Browninan filter](assets/PEP_NASDAQ.png)
+  <p><i>A simple tick chart</i></p>
+</kbd>
 
 ### As Server
 ```
