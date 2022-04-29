@@ -21,7 +21,11 @@
       1. [About the orderbook and matching](#about-the-orderbook-and-matching)
 3.   [About random numbers, distributions and generators used](#about-random-numbers-distributions-and-generators-used)
       1. [Prices](#prices)
-5.   [Runtime Interaction](#runtime-interaction)
+1.   [Misc Functions](#misc-functions)
+      1. [Capture Screen Output](#capture-screen-output)
+      1. [Tick Capture](#tick-capture)
+      1. [Thread Naming](#thread-naming)
+1.   [Runtime Interaction](#runtime-interaction)
       1. [As Server](#as-server)
       1. [As Client](#as-client)
       1. [Command descriptions](#command-descriptions)
@@ -57,12 +61,9 @@ This example uses the standard FIX44 dictionary, uses high quality pseudo-random
 
 ## Releases
 There are a number of releases available. Each release builds on the previous in terms of complexity and functionality. These are summarised here:
-- Simple client/server with `NewOrderSingle` and `ExecutionReport` (order mode only)
-  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/dd8603eef63d71aa3d87574a688b4fc0fa592875)
-- Client/server with market data generation, simple aggregated order book (order mode and market data mode)
-  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
-- Client/server with market data history (custom FIX messages) (order mode and market data mode)
-  - [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
+1. Simple client/server with `NewOrderSingle` and `ExecutionReport` (order mode only). [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/dd8603eef63d71aa3d87574a688b4fc0fa592875)
+1. Client/server with market data generation, simple aggregated order book (order mode and market data mode). [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
+1. Client/server with market data history (custom FIX messages) (order mode and market data mode). [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
 
 You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases). 
 
@@ -387,6 +388,16 @@ In market data mode, toggles the generation of market data from the server; in o
 Toggles output; when client mode is on, no market data or order messages are displayed
 #### toggle states
 When enabled, the application will verbosely display session and reliable session states as they change
+
+## Misc Functions
+### Capture Screen Output
+Passing a filename with the `--capture` switch will cause the client (or server) to send a copy of all screen output to specified file. Note that screen escape sequences (such as colours, etc) will be filtered out.
+
+### Tick Capture
+Passing a filename with the `--tickcapture` will cause the server to save each tick to the specified file. Use in combination with `--numsec 1` to capture a single security's tick data.
+
+### Thread Naming
+Passing a name with the `--threadname` will cause the client or server to append the name to the OS thread name. This will allow you to identify the application threads and filter them by name for viewing (see example below).
 
 ## Sample output
 
