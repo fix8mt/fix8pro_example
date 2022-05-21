@@ -74,7 +74,6 @@ using BidsAggregated = std::map<double, std::tuple<uint32_t, uint32_t>, std::gre
 using AsksAggregated = std::map<double, std::tuple<uint32_t, uint32_t>>; // price: total qty, total size
 using OrderBook = std::map<f8String, std::tuple<BidsAggregated, AsksAggregated>>;
 using TickBar = std::map<Tickval, std::tuple<double, uint32_t>>;
-using TOHLCVN = std::tuple<Tickval, double, double, double, double, uint32_t, uint32_t>;
 struct History
 {
 	TickBar _ticks; // tick history - time:price/qty
@@ -82,7 +81,6 @@ struct History
 	uint32_t tvol = 0;
 };
 using Histories = std::map<f8String, History>;
-
 //-----------------------------------------------------------------------------------------
 class Brownian final
 {
@@ -212,6 +210,8 @@ public:
 //-----------------------------------------------------------------------------------------
 namespace
 {
+	constexpr const int MaxRptElPerMsg = 20;
+
 	f8String make_id(int val)
 	{
 		std::ostringstream ostr;

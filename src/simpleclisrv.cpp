@@ -721,7 +721,7 @@ bool SimpleSession::operator()(const NewOrderSingle *msg)
 				int ncnt = 0;
 				for (auto trdqtycb = trdqty; trdqtycb > 0; ++ncnt)
 				{
-					constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
+					static constexpr const std::array broker_nms { "BRTS", "KLMR", "NYVY", "NXPR", "SIMM", "STANS", "AVR1", "AVR2", "HULV", "HULZ", "CAMS", "ORTA" };
 					auto gr1 = nocb->create_group();
 					auto retrdqtycb = std::uniform_int_distribution<>(1, trdqtycb)(_app._eng); // random qty
 					*gr1  << er->make_field<ContraBroker>(broker_nms[std::uniform_int_distribution<>(0, broker_nms.size() - 1)(_app._eng)]) // random cb

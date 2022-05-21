@@ -385,7 +385,6 @@ bool SimpleSession::pregenerate_send_marketdata()
 	}
 	slck.acquire(_spin_lock);
 	_subscriptions_vec = std::move(wsubs);
-	slck.release();
 	return true;
 }
 
@@ -393,7 +392,7 @@ bool SimpleSession::pregenerate_send_marketdata()
 /// Generate marketdata randomly
 bool SimpleSession::generate_send_marketdata()
 {
-	if (first_only<0>::is_first())
+	if (first_only::is_first<SimpleSession>())
 	{
 		if (_app.has("tickcapture"))
 			_tofs = std::make_unique<std::ofstream>(_app._tickfile.c_str(), std::ios::trunc);
@@ -514,7 +513,7 @@ bool SimpleSession::operator()(const SecurityList *msg)
 		}
 
 		const auto& grnomdet = mdr->find_group<MarketDataRequest::NoMDEntryTypes>();
-		constexpr const std::array mdtypes { MDEntryType::Bid, MDEntryType::Offer, MDEntryType::Trade, MDEntryType::OpeningPrice,
+		static constexpr const std::array mdtypes { MDEntryType::Bid, MDEntryType::Offer, MDEntryType::Trade, MDEntryType::OpeningPrice,
 			MDEntryType::ClosingPrice, MDEntryType::TradeVolume, MDEntryType::TradingSessionHighPrice, MDEntryType::TradingSessionLowPrice,
 			MDEntryType::TradingSessionVWAPPrice };
 		for (const auto pp : mdtypes)
@@ -631,12 +630,12 @@ bool SimpleSession::operator()(const MarketDataRequestReject *msg)
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
+bool SimpleSession::operator()(const MarketDataHistoryRequest *msg) // user defined
 {
 	auto calc_ohlc([](TickBar::const_iterator& st, TickBar::const_iterator se, Tickval::ticks secperiod)->auto const
 	{
 		const auto period_boundary = st->first.get_ticks() - (st->first.get_ticks() % secperiod); // start on period boundary
-		TOHLCVN tohlcvn;
+		std::tuple<Tickval, double, double, double, double, uint32_t, uint32_t> tohlcvn;
 		auto& [t,o,h,l,c,v,n] = tohlcvn;
 
 		for (const auto next_boundary = period_boundary + secperiod; st != se && st->first.get_ticks() < next_boundary; ++st, ++n)
@@ -657,7 +656,7 @@ bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
 		return tohlcvn;
 	});
 
-	constexpr const std::array Periods
+	static constexpr const std::array Periods
 	{
 		Tickval::noticks, Tickval::minute, Tickval::hour, Tickval::day, Tickval::week,
 		Tickval::ticks(365.2425 * Tickval::day / 12), Tickval::ticks(365.2425 * Tickval::day)
@@ -689,7 +688,7 @@ bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
 					{
 						auto mdfr = make_message<MarketDataHistoryFullRefresh>();
 						const auto& grnomden = mdfr->find_group<MarketDataHistoryFullRefresh::NoMDHistory>();
-						for (rcnt = 0; rcnt < 20 && itr != rec._ticks.cend(); ++itr)
+						for (rcnt = 0; rcnt < MaxRptElPerMsg && itr != rec._ticks.cend(); ++itr)
 						{
 							const auto& [px, qty] = itr->second;
 							auto gr1 = grnomden->create_group();
@@ -721,7 +720,7 @@ bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
 					{
 						auto mdfr = make_message<MarketDataHistoryFullRefresh>();
 						const auto& grnomden = mdfr->find_group<MarketDataHistoryFullRefresh::NoMDHistory>();
-						for (rcnt = 0; rcnt < 20 && itr != rec._ticks.cend(); ++rcnt, ++cnt)
+						for (rcnt = 0; rcnt < MaxRptElPerMsg && itr != rec._ticks.cend(); ++rcnt, ++cnt)
 						{
 							auto [t,o,h,l,c,v,n] = calc_ohlc(itr, rec._ticks.cend(), Periods[val]);
 							auto gr1 = grnomden->create_group();
@@ -738,7 +737,7 @@ bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
 								<< mdfr->make_field<Symbol>(sym)
 								<< mdfr->make_field<MDHistoryPeriod>(val)
 								<< mdfr->make_field<NoMDHistory>(rcnt);
-						if (rcnt < 20)
+						if (rcnt < MaxRptElPerMsg)
 							*mdfr << mdfr->make_field<LastHistoryMessage>(true);
 						send(std::move(mdfr));
 					}
@@ -760,7 +759,7 @@ bool SimpleSession::operator()(const MarketDataHistoryRequest *msg)
 }
 
 //-----------------------------------------------------------------------------------------
-bool SimpleSession::operator()(const MarketDataHistoryFullRefresh *msg)
+bool SimpleSession::operator()(const MarketDataHistoryFullRefresh *msg) // user defined
 {
 	return true;
 }
