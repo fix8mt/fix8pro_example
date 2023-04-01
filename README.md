@@ -68,10 +68,14 @@ There are a number of releases available. Each release builds on the previous in
 You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases).
 
 ## To download
+<<<<<<< HEAD
 There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version)
 and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge).
 
 Optionally specify the `dev` branch when you clone:
+=======
+There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version) and [`dev`](https://github.com/fix8mt/fix8pro_example/tree/dev) (latest cutting edge). Optionally specify the `dev` branch when you clone:
+>>>>>>> dd8603eef63d71aa3d87574a688b4fc0fa592875
 ```bash
 git clone https://github.com/fix8mt/fix8pro_example.git [-b dev]
 cd fix8pro_example
