@@ -65,7 +65,7 @@ There are a number of releases available. Each release builds on the previous in
 1. Client/server with market data generation, simple aggregated order book (order mode and market data mode). [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
 1. Client/server with market data history (custom FIX messages) (order mode and market data mode). [Browse the source](https://github.com/fix8mt/fix8pro_example/tree/4960b3a7873d2f5492d4eae595467f71cc45e7d4)
 
-You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases). 
+You can read about all the available releases [`here`](https://github.com/fix8mt/fix8pro_example/releases).
 
 ## To download
 There are two branches: [`master`](https://github.com/fix8mt/fix8pro_example) (stable version)
@@ -343,7 +343,7 @@ The following parameters can be set on the command line:
 | volume | amount of 'swing' | 0.0 - 50.0 | 20.0 |
 | lpf | low pass filter level | 0.0 - 1.0 | 0.025 |
 
-Larger _drift_ yields larger trends away from the reference price. Larger _volume_ has a similar effect. Lower _lpf_ creats more varibility. You will need to experiemt to find the combination of the three to suit your purposes.
+Larger _drift_ yields larger trends away from the reference price. Larger _volume_ has a similar effect. Lower _lpf_ creats more variability. You will need to experiemt to find the combination of the three to suit your purposes.
 
 ## Runtime Interaction
 A simple command menu is provided where you can control certain aspects of the application.
