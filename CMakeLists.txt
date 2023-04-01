@@ -8,10 +8,10 @@
 ##      \ \_\   \ \_\ /\_/\_\  \ \____/   \ \_\  \ \_\ \ \____/
 ##       \/_/    \/_/ \//\/_/   \/___/     \/_/   \/_/  \/___/
 ##
-##               Fix8Pro FIX Engine and Framework
+##                Fix8Pro Example Client Server
 ##
-## Copyright (C) 2010-21 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
-## All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
+## Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
+## ALL RIGHTS RESERVED  https://www.fix8mt.com  heretohelp@fix8mt.com  @fix8mt
 ##
 ## This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 3.  You can
 ## redistribute  it  and / or modify  it under the  terms of  the  GNU Lesser  General  Public
@@ -43,13 +43,13 @@
 #############################################################################################
 cmake_minimum_required(VERSION 3.13)
 set(CMAKE_VERBOSE_MAKEFILE FALSE)
-project(examples)
+project(fix8pro_example)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS NO)
-if(${CMAKE_CXX_COMPILER_VERSION} MATCHES "^3.+" OR "${CMAKE_CXX_COMPILER_VERSION}" MATCHES "^4.+")
-	message(ERROR "!!! unsupported compiler version, require >= GCC 5+, but only found ${CMAKE_CXX_COMPILER_VERSION}")
+if(${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 9.0.0)
+	message(FATAL_ERROR "Unsupported compiler version. Require gcc >= 9+; your version is ${CMAKE_CXX_COMPILER_VERSION}")
 endif()
 
 set(CMAKE_DEBUG_POSTFIX "d" CACHE STRING "Generate debug library name with a postfix.")
@@ -67,7 +67,7 @@ set(_IMPORT_PREFIX ${FIX8PRO_ROOT})
 include(cmake/macros.cmake)
 
 # enable address sanitizer for tracing memory leaks
-option(ENABLE_ADDRESS_SANITIZER    "enable address sanitizer (default=no)" OFF)
+option(ENABLE_ADDRESS_SANITIZER "enable address sanitizer (default=no)" OFF)
 
 # gcc settings
 set(${project_prefix}_COMPILER_SYMBOLS_VISIBILITY PRIVATE -fvisibility=hidden)
@@ -91,19 +91,26 @@ endif()
 include_directories(${FIX8PRO_ROOT}/include)
 include_directories(${CMAKE_BINARY_DIR}/include)
 
+# shared FIX44 lib
+add_gen_shared_library(FIX44_EXAMPLE schema/FIX44_custom.xml -G ${CMAKE_SOURCE_DIR}/schema/FIX44_en_phrases_custom.xml -L -U --verbose --namespace FIX44_EXAMPLE -p FIX44_EXAMPLE)
+target_link_libraries(FIX44_EXAMPLE PRIVATE fix8pro fix8proutils)
+
 # shared FIX42 lib
-add_gen_shared_library(FIX42_EXAMPLE schema/FIX42.xml -G ../../../schema/FIX42_en_phrases.xml -L --verbose --namespace FIX42_EXAMPLE -p FIX42_EXAMPLE)
-	target_link_libraries(FIX42_EXAMPLE PRIVATE fix8pro fix8proutils)
+# add_gen_shared_library(FIX42_EXAMPLE schema/FIX42.xml -G ${CMAKE_SOURCE_DIR}/schema/FIX42_en_phrases.xml -L -U --verbose --namespace FIX42_EXAMPLE -p FIX42_EXAMPLE)
+# target_link_libraries(FIX42_EXAMPLE PRIVATE fix8pro fix8proutils)
+
 # static FIX50SP2 lib
 # add_gen_static_library(FIX50SP2 schema/FIX50SP2.xml  -L --verbose --namespace FIX50SP2 -p FIX50SP2 --fixt ${CMAKE_CURRENT_SOURCE_DIR}/schema/FIXT11.xml)
-#	target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
-add_executable(simpleclisrv simpleclisrv.cpp)
-	target_link_libraries(simpleclisrv PRIVATE FIX42_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
+# target_link_libraries(FIX50SP2 PRIVATE fix8pro fix8proutils)
+
+add_executable(simpleclisrv src/simpleclisrv.cpp src/marketdata.cpp)
+include_directories(src)
+target_link_libraries(simpleclisrv PRIVATE FIX44_EXAMPLE fix8pro fix8proutils fix8pro_statapp)
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set(CMAKE_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/.install" CACHE PATH "install path" FORCE)
 endif()
 message("-- Installation path ${CMAKE_INSTALL_PREFIX}")
-install(TARGETS simpleclisrv FIX42_EXAMPLE RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib/static)
+install(TARGETS simpleclisrv FIX44_EXAMPLE RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib/static)
 install(DIRECTORY config DESTINATION share/fix8pro FILES_MATCHING PATTERN *.xml)
 

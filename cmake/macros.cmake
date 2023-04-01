@@ -8,10 +8,10 @@
 ##      \ \_\   \ \_\ /\_/\_\  \ \____/   \ \_\  \ \_\ \ \____/
 ##       \/_/    \/_/ \//\/_/   \/___/     \/_/   \/_/  \/___/
 ##
-##               Fix8Pro FIX Engine and Framework
+##                Fix8Pro Example Client Server
 ##
-## Copyright (C) 2010-21 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
-## All Rights Reserved. [http://www.fix8mt.com] <heretohelp@fix8mt.com>
+## Copyright (C) 2010-22 Fix8 Market Technologies Pty Ltd (ABN 29 167 027 198)
+## ALL RIGHTS RESERVED  https://www.fix8mt.com  heretohelp@fix8mt.com  @fix8mt
 ##
 ## This  file is released  under the  GNU LESSER  GENERAL PUBLIC  LICENSE  Version 3.  You can
 ## redistribute  it  and / or modify  it under the  terms of  the  GNU Lesser  General  Public
